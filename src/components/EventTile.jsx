@@ -1,21 +1,18 @@
-import React, { useState } from "react";
+import { Card, CardMedia, CardContent, Typography } from "@mui/material";
 
-function EventTile({ eventID }) {
-    const [showDetails, setShowDetails] = useState(false);
-
+function EventCard({ event }) {
     return (
-        <div className="event-tile">
-            <h3>{event.title}</h3>
-            <p>{event.date}</p>
-            <button onClick={() => setShowDetails(!showDetails)}>
-                {showDetails ? "Hide Details" : "Show Details"}
-            </button>
-            {showDetails && (
-                <div>
-                    <p>{event.description}</p>
-                    <p>{event.location}</p>
-                </div>
+        <Card sx={{ mb: 2 }}>
+            {event.image_url && (
+                <CardMedia component="img" height="200" image={event.image_url} alt={event.name} />
             )}
-        </div>
+            <CardContent>
+                <Typography variant="h5">{event.name}</Typography>
+                <Typography variant="body2" color="textSecondary">{event.description}</Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>📅 {event.date}</Typography>
+            </CardContent>
+        </Card>
     );
 }
+
+export default EventCard;
