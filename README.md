@@ -1,8 +1,9 @@
-# React + Vite
+# Brunel Sailing Sign-Up Form
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Using React + Vite + Supabase + MatierialUI
 
-Currently, two official plugins are available:
+Mainly a project to take my first steps into full-stack development but with the side benefit of solving the issue of my not-so-smooth setup using Microsoft Forms and PowerBI
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Do not expect the finest programming, many guides and AI are used to explain things and debug so the coding style is interesting.
+
+
