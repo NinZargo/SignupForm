@@ -1,44 +1,60 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, List, ListItem, ListItemText, Button, Checkbox, FormControlLabel } from "@mui/material";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { Container, Typography, Card, CardContent, CardMedia, Button, Box, Checkbox, FormControlLabel } from "@mui/material";
 
-function EventSignup({ open, handleClose, event, userRole, fetchSignups, signups }) {
+function EventSignup() {
+    const { eventId } = useParams();
+    const [event, setEvent] = useState(null);
     const [user, setUser] = useState(null);
+    const [role, setRole] = useState(null);
     const [canDrive, setCanDrive] = useState(false);
     const [needTransport, setNeedTransport] = useState(false);
-    const [isSignedUp, setIsSignedUp] = useState(false);
+    const navigate = useNavigate();
 
-    // Fetch current user data
+    // Fetch Event Details
+    useEffect(() => {
+        async function fetchEvent() {
+            let { data, error } = await supabase
+                .from("events")
+                .select("*")
+                .eq("id", eventId)
+                .single();
+
+            if (error) console.error("Error fetching event:", error);
+            else setEvent(data);
+        }
+
+        fetchEvent();
+    }, [eventId]);
+
+    // Fetch Current User Data
     useEffect(() => {
         async function fetchUser() {
-            const { data: userData, error } = await supabase.auth.getUser();
-            if (error) {
-                console.error("Error fetching user:", error);
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError) {
+                console.error("Error fetching user:", userError);
                 return;
             }
             setUser(userData?.user);
 
-            // Check if user is already signed up
+            // Fetch User Role from `users` table
             if (userData?.user) {
-                const { data: existingSignup, error: signupError } = await supabase
-                    .from("signups")
-                    .select("*")
-                    .eq("user_id", userData.user.id)
-                    .eq("event_id", event.id)
+                const { data: roleData, error: roleError } = await supabase
+                    .from("users")
+                    .select("role")
+                    .eq("id", userData.user.id)
                     .single();
 
-                if (signupError && signupError.code !== "PGRST116") {
-                    console.error("Error checking signup:", signupError);
-                } else if (existingSignup) {
-                    setIsSignedUp(true);
-                }
+                if (roleError) console.error("Error fetching user role:", roleError);
+                else setRole(roleData?.role);
             }
         }
 
-        if (event) fetchUser();
-    }, [event]);
+        fetchUser();
+    }, []);
 
-    // Handle signup
+    // Handle Signup
     async function handleSignup() {
         if (!user || !event) return;
 
@@ -46,9 +62,10 @@ function EventSignup({ open, handleClose, event, userRole, fetchSignups, signups
             {
                 user_id: user.id,
                 event_id: event.id,
+                session_id: null, // Modify if you have a session selection system
                 can_drive: canDrive,
                 transport_needed: needTransport,
-                status: "Pending",
+                status: "Pending" // Assuming 'pending' is a valid default
             },
         ]);
 
@@ -57,67 +74,48 @@ function EventSignup({ open, handleClose, event, userRole, fetchSignups, signups
             alert("Failed to sign up. Please try again.");
         } else {
             alert("Successfully signed up!");
-            setIsSignedUp(true);
-            fetchSignups(); // Refresh signups list
+            navigate("/dashboard");
         }
     }
 
+    if (!event) return <Typography>Loading event details...</Typography>;
+
     return (
-        <Dialog open={open} onClose={handleClose}>
-            <DialogTitle>{event.name}</DialogTitle>
-            <DialogContent>
-                <Typography variant="body1" gutterBottom>
-                    {event.description || "No description available."}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                    📅 {new Date(event.date).toLocaleDateString()}
-                </Typography>
+        <Container maxWidth="xl" sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", width: "100vw" }}>
+            <Box display="flex" justifyContent="center">
+                <Card sx={{ maxWidth: "80%", width: "100%" }}>
+                    <CardMedia component="img" height="400" image={event.image_url || "/default-event.jpg"} alt={event.name} />
+                    <CardContent>
+                        <Typography variant="h4" gutterBottom align="center">{event.name}</Typography>
+                        <Typography variant="body1" color="textSecondary" align="center">{event.description}</Typography>
+                        <Typography variant="body2" sx={{ mt: 2, textAlign: "center" }}>📅 {event.date}</Typography>
 
-                {/* Show total signups */}
-                <Typography variant="h6" sx={{ mt: 2 }}>
-                    Signups: {signups.length}
-                </Typography>
+                        {/* Show Driver Checkbox if user is a driver */}
+                        {role === "Driver" ? (
+                            <Box display="flex" justifyContent="center" mt={2}>
+                                <FormControlLabel
+                                    control={<Checkbox checked={canDrive} onChange={(e) => setCanDrive(e.target.checked)} />}
+                                    label="I can drive"
+                                />
+                            </Box>
+                        ) : (
+                            <Box display="flex" justifyContent="center" mt={2}>
+                                <FormControlLabel
+                                    control={<Checkbox checked={needTransport} onChange={(e) => setNeedTransport(e.target.checked)} />}
+                                    label="I need Transport"
+                                />
+                            </Box>
+                        )}
 
-                {/* Show full signup list only for admins */}
-                {userRole === "admin" && signups.length > 0 && (
-                    <List>
-                        {signups.map((signup) => (
-                            <ListItem key={signup.users.id}>
-                                <ListItemText primary={signup.users?.name || "Unknown User"} />
-                            </ListItem>
-                        ))}
-                    </List>
-                )}
-
-                {/* Signup options for users */}
-                {user && !isSignedUp && (
-                    <>
-                        <FormControlLabel
-                            control={<Checkbox checked={canDrive} onChange={(e) => setCanDrive(e.target.checked)} />}
-                            label="I can drive"
-                        />
-                        <FormControlLabel
-                            control={<Checkbox checked={needTransport} onChange={(e) => setNeedTransport(e.target.checked)} />}
-                            label="I need transport"
-                        />
-                        <Button variant="contained" color="primary" onClick={handleSignup} sx={{ mt: 2 }}>
-                            Sign Up
-                        </Button>
-                    </>
-                )}
-
-                {isSignedUp && <Typography color="primary">✅ You are signed up for this event.</Typography>}
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={handleClose}>Close</Button>
-                {userRole === "admin" && (
-                    <Button variant="contained" onClick={fetchSignups}>
-                        Refresh Signups
-                    </Button>
-                )}
-            </DialogActions>
-        </Dialog>
+                        <Box display="flex" justifyContent="center" mt={3}>
+                            <Button variant="contained" color="primary" onClick={handleSignup}>Sign Up</Button>
+                        </Box>
+                    </CardContent>
+                </Card>
+            </Box>
+        </Container>
     );
 }
 
 export default EventSignup;
+

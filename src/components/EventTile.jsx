@@ -12,7 +12,10 @@ import {
     Button,
     List,
     ListItem,
-    ListItemText
+    ListItemText,
+    Box,
+    FormControlLabel,
+    Checkbox
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
 
@@ -20,7 +23,12 @@ function EventTile({ event }) {
     const [userRole, setUserRole] = useState(null);
     const [open, setOpen] = useState(false);
     const [signups, setSignups] = useState([]);
+    const [isSignedUp, setIsSignedUp] = useState(false);
+    const [role, setRole] = useState(null);
+    const [canDrive, setCanDrive] = useState(false);
+    const [needTransport, setNeedTransport] = useState(false);
 
+    // Fetch user role on component mount
     useEffect(() => {
         async function fetchUserRole() {
             const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -31,44 +39,102 @@ function EventTile({ event }) {
 
             const { data, error } = await supabase
                 .from("users")
-                .select("is_admin")
+                .select("is_admin, role")
                 .eq("id", userData.user.id)
                 .single();
 
             if (error) {
-                console.error("Error fetching is_admin:", error);
+                console.error("Error fetching user role:", error);
                 return;
             }
 
             setUserRole(data.is_admin ? "admin" : "user");
+            setRole(data.role);
         }
 
         fetchUserRole();
     }, []);
 
-    const handleOpen = () => {
-        fetchSignups();
-        setOpen(true);
-    }
+    // Handle opening the dialog
+    const handleOpen = async () => {
+        setOpen(true); // Open the dialog immediately
+        await Promise.all([fetchSignups(), checkUserSignup()]); // Run async operations in parallel
+    };
+
+    // Handle closing the dialog
     const handleClose = () => {
-        setSignups([]); // Clear signups when closing
+        setSignups([]);
         setOpen(false);
     };
 
-    // Fetch signups when "View Signups" is clicked
+    // Fetch signups for the event
     const fetchSignups = async () => {
         const { data, error } = await supabase
             .from("signups")
-            .select("users!signups_user_id_fkey(id, name, email)") // Ensure correct foreign key
-            .eq("event_id", event.id); // Use event.id instead of selectedEventId
+            .select(`
+                id,
+                user_id,
+                event_id,
+                transport_needed,
+                status,
+                can_drive,
+                users:signups_user_id_fkey(id, name, email)
+            `)
+            .eq("event_id", event.id);
 
         if (error) {
             console.error("Error fetching signups:", error);
             return;
         }
 
-        console.log("Fetched signups:", data);
         setSignups(data || []);
+    };
+
+    // Check if the current user has signed up for the event
+    const checkUserSignup = async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) return;
+
+        const { data, error } = await supabase
+            .from("signups")
+            .select("id")
+            .eq("event_id", event.id)
+            .eq("user_id", userData.user.id);
+
+        if (error) {
+            console.error("Error checking signup status:", error);
+            return;
+        }
+
+        setIsSignedUp(data.length > 0);
+    };
+
+    // Handle signing up for the event
+    const handleSignup = async () => {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) {
+            console.error("Error fetching user:", userError);
+            return;
+        }
+
+        const { error } = await supabase.from("signups").insert([
+            {
+                user_id: userData.user.id,
+                event_id: event.id,
+                can_drive: canDrive,
+                transport_needed: needTransport,
+                status: "Pending"
+            },
+        ]);
+
+        if (error) {
+            console.error("Error signing up:", error);
+            alert("Failed to sign up. Please try again.");
+        } else {
+            alert("Successfully signed up!");
+            setIsSignedUp(true);
+            await fetchSignups(); // Refresh the list
+        }
     };
 
     return (
@@ -93,12 +159,11 @@ function EventTile({ event }) {
             <Dialog open={open} onClose={handleClose}>
                 <DialogTitle>{event.name}</DialogTitle>
                 <DialogContent>
-                    {/* Display event image */}
                     {event.image_url && (
                         <CardMedia
                             component="img"
                             height="200"
-                            image={event.image_url} // Ensure this is a valid URL
+                            image={event.image_url}
                             alt={event.name}
                             sx={{ borderRadius: 2, marginBottom: 2 }}
                         />
@@ -111,33 +176,42 @@ function EventTile({ event }) {
                     <Typography variant="body2" color="textSecondary">
                         📅 {new Date(event.date).toLocaleDateString()}
                     </Typography>
-                    {/* Show number of signups for all users */}
+
                     <Typography variant="h6" sx={{ mt: 2 }}>
                         Signups: {signups.length}
                     </Typography>
 
-                    {/* Show full signups list ONLY for admins */}
                     {userRole === "admin" && signups.length > 0 && (
                         <List>
                             {signups.map((signup) => (
-                                <ListItem key={signup.users.id}>
-                                    <ListItemText primary={signup.users?.name || "Unknown User"} />
+                                <ListItem key={signup.users?.id || Math.random()}>
+                                    <ListItemText primary={signup.users?.name || `Unknown User`} />
                                 </ListItem>
                             ))}
                         </List>
                     )}
 
-                    <DialogActions>
-                        <Button onClick={handleClose}>Close</Button>
-
-                        {/* Only show "View Signups" button if the user is an admin */}
-                        {userRole === "admin" && (
-                            <Button variant="contained" onClick={fetchSignups}>
-                                View Signups
-                            </Button>
-                        )}
-                    </DialogActions>
+                    {/* Transport & Driver Checkboxes */}
+                    {role === "Driver" ? (
+                        <Box display="flex" justifyContent="center" mt={2}>
+                            <FormControlLabel
+                                control={<Checkbox checked={canDrive} onChange={(e) => setCanDrive(e.target.checked)} />}
+                                label="I can drive"
+                            />
+                        </Box>
+                    ) : (
+                        <Box display="flex" justifyContent="center" mt={2}>
+                            <FormControlLabel
+                                control={<Checkbox checked={needTransport} onChange={(e) => setNeedTransport(e.target.checked)} />}
+                                label="I need Transport"
+                            />
+                        </Box>
+                    )}
                 </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClose}>Close</Button>
+                    {!isSignedUp && <Button variant="contained" onClick={handleSignup}>Sign Up</Button>}
+                </DialogActions>
             </Dialog>
         </>
     );

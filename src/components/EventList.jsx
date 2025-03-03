@@ -44,15 +44,11 @@ function EventList() {
                 return;
             }
 
-            console.log("Logged-in User ID:", userData.user.id); // Debugging
-
             const { data, error } = await supabase
                 .from("users") // Ensure this is the correct table name
                 .select("is_admin")
                 .eq("id", userData.user.id)
                 .single();
-
-            console.log("Supabase Query Result:", data, error);
 
             if (error) {
                 console.error("Error fetching is_admin:", error);
