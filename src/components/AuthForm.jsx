@@ -22,7 +22,9 @@ const AuthForm = () => {
         } else if (formType === 'signin') {
             response = await supabase.auth.signInWithPassword({ email, password });
         } else if (formType === 'forgot') {
-            response = await supabase.auth.resetPasswordForEmail(email);
+            response = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: 'https://NinZargo.github.io/SignupForm/#/reset-password'
+            });
         }
 
         if (response.error) {

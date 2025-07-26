@@ -7,6 +7,7 @@ import AccountSetup from "./components/AccountSetup";
 import Dashboard from "./components/Dashboard";
 import EventSignup from "./components/EventSignup";
 import MySignups from "./components/MySignups";
+import ResetPassword from "./components/ResetPassword.jsx";
 
 function App() {
     return (
@@ -15,6 +16,7 @@ function App() {
             <Routes>
                 <Route path="/" element={<AuthForm />} />
                 <Route path="/setup" element={<AccountSetup />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
                 <Route path="/signup/:eventId" element={<Layout><EventSignup /></Layout>} />
                 <Route path="/mysignups" element={<Layout><MySignups /></Layout>} />
