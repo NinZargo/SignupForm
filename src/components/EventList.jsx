@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import {
-    Container,
     Typography,
     Box,
     Button,
@@ -10,82 +9,76 @@ import {
     DialogContent,
     TextField,
     DialogActions,
-    TextareaAutosize
+    TextareaAutosize,
+    FormControlLabel,
+    Switch,
+    Paper
 } from "@mui/material";
 import { Masonry } from "@mui/lab";
 import EventCard from "./EventTile.jsx";
 import fetchUnsplashImage from "./UnsplashImg";
+import { useUser } from '../contexts/UserContext';
 
 function EventList() {
+    const { isAdmin } = useUser();
     const [events, setEvents] = useState([]);
-    const [userRole, setUserRole] = useState(null);
-    const [signedUpEventIds, setSignedUpEventIds] = useState(new Set());
+    const [signedUpStatusMap, setSignedUpStatusMap] = useState(new Map());
     const [loading, setLoading] = useState(true);
-
     const [open, setOpen] = useState(false);
-    const [newEvent, setNewEvent] = useState({ name: "", date: "", location: "", image_url: "", description: "" });
+    const [newEvent, setNewEvent] = useState({ name: "", date: "", location: "", image_url: "", description: "", requires_approval: false });
 
     useEffect(() => {
         async function fetchDashboardData() {
             setLoading(true);
-
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setLoading(false);
-                return;
-            }
+            if (!user) { setLoading(false); return; }
 
-            const [eventsResponse, signupsResponse, userRoleResponse] = await Promise.all([
-                supabase.from("events").select("*").order("date", { ascending: true }),
-                supabase.from("signups").select("event_id").eq("user_id", user.id),
-                supabase.from("users").select("is_admin").eq("id", user.id).single()
+            const [eventsResponse, signupsResponse] = await Promise.all([
+                supabase.from("events").select("*, requires_approval").order("date", { ascending: true }),
+                supabase.from("signups").select("event_id, status").eq("user_id", user.id),
             ]);
 
-            if (eventsResponse.error) console.error("Error fetching events:", eventsResponse.error);
-            else setEvents(eventsResponse.data || []);
-
-            if (signupsResponse.error) console.error("Error fetching signups:", signupsResponse.error);
-            else {
-                const eventIdSet = new Set(signupsResponse.data.map(signup => signup.event_id));
-                setSignedUpEventIds(eventIdSet);
+            if (eventsResponse.data) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const futureEvents = eventsResponse.data.filter(event => new Date(event.date) >= today);
+                setEvents(futureEvents);
             }
 
-            if (userRoleResponse.error) console.error("Error fetching user role:", userRoleResponse.error);
-            else if (userRoleResponse.data) {
-                setUserRole(userRoleResponse.data.is_admin ? "admin" : "user");
+            if (signupsResponse.data) {
+                const statusMap = new Map(signupsResponse.data.map(signup => [signup.event_id, signup.status]));
+                setSignedUpStatusMap(statusMap);
             }
-
             setLoading(false);
         }
-
         fetchDashboardData();
     }, []);
 
     const handleOpen = () => setOpen(true);
     const handleClose = () => setOpen(false);
-
     const handleChange = (e) => {
-        setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
+        const { name, value, type, checked } = e.target;
+        setNewEvent({ ...newEvent, [name]: type === 'checkbox' ? checked : value });
     };
-
     const handleCreateEvent = async () => {
         if (!newEvent.name) return alert("Event name is required!");
-
         let imageUrl = newEvent.image_url;
-        if (!imageUrl) {
-            imageUrl = await fetchUnsplashImage(newEvent.name);
-        }
+        if (!imageUrl) imageUrl = await fetchUnsplashImage(newEvent.name);
 
         const eventData = { ...newEvent, image_url: imageUrl || "default-image-url.jpg" };
-
         const { data, error } = await supabase.from("events").insert([eventData]).select();
 
         if (error) {
             console.error("Error creating event:", error);
-            alert("Failed to create event");
         } else {
-            setEvents(prevEvents => [...prevEvents, ...data]);
-            setNewEvent({ name: "", date: "", location: "", image_url: "", description: "" });
+            const { data: refreshedEvents } = await supabase.from("events").select("*, requires_approval").order("date", { ascending: true });
+            if (refreshedEvents) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const futureEvents = refreshedEvents.filter(event => new Date(event.date) >= today);
+                setEvents(futureEvents);
+            }
+            setNewEvent({ name: "", date: "", location: "", image_url: "", description: "", requires_approval: false });
             handleClose();
         }
     };
@@ -93,22 +86,37 @@ function EventList() {
     if (loading) return <Typography>Loading events...</Typography>;
 
     return (
-        <Container maxWidth={false} sx={{ width: "90vw", paddingY: 4 }}>
-            <Box sx={{ width: "100%", textAlign: "center", marginBottom: 2 }}>
-                <Typography variant="h3">Upcoming Events</Typography>
-                {userRole === "admin" && (
-                    <Button variant="contained" color="primary" onClick={handleOpen} sx={{ marginTop: 2 }}>
+        <Box>
+            <Paper
+                elevation={4}
+                sx={{
+                    p: { xs: 2, sm: 4 },
+                    mb: 4,
+                    borderRadius: 2,
+                    textAlign: 'center',
+                    background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                    color: 'white'
+                }}
+            >
+                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+                    Upcoming Events
+                </Typography>
+                <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Browse and sign up for our latest sailing adventures.
+                </Typography>
+                {isAdmin && (
+                    <Button variant="contained" color="secondary" onClick={handleOpen}>
                         + New Event
                     </Button>
                 )}
-            </Box>
+            </Paper>
 
             <Masonry columns={{ xs: 1, sm: 2, md: 3, lg: 4 }} spacing={2}>
                 {events.map((event) => (
                     <EventCard
                         key={event.id}
                         event={event}
-                        isInitiallySignedUp={signedUpEventIds.has(event.id)}
+                        initialSignupStatus={signedUpStatusMap.get(event.id) || null}
                     />
                 ))}
             </Masonry>
@@ -120,22 +128,25 @@ function EventList() {
                     <TextField label="Date" name="date" type="date" fullWidth onChange={handleChange} InputLabelProps={{ shrink: true }} sx={{ my: 1 }} />
                     <TextField label="Location" name="location" fullWidth onChange={handleChange} sx={{ my: 1 }} />
                     <TextField label="Image URL" name="image_url" fullWidth onChange={handleChange} sx={{ my: 1 }} />
-                    <TextareaAutosize
-                        name="description"
-                        minRows={3}
-                        placeholder="Enter event description..."
-                        style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ccc", marginTop: '8px' }}
-                        onChange={handleChange}
+                    <TextareaAutosize name="description" minRows={3} placeholder="Enter event description..." style={{ width: "100%", padding: "8px" }} onChange={handleChange} />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={newEvent.requires_approval}
+                                onChange={handleChange}
+                                name="requires_approval"
+                            />
+                        }
+                        label="Waitlist / Requires Approval"
+                        sx={{ mt: 1 }}
                     />
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleCreateEvent} variant="contained">
-                        Create
-                    </Button>
+                    <Button onClick={handleCreateEvent} variant="contained">Create</Button>
                 </DialogActions>
             </Dialog>
-        </Container>
+        </Box>
     );
 }
 
