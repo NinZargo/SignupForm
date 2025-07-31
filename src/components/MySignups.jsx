@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import { Container, Typography, Card, CardContent, Button, Box, Snackbar, Alert, Divider, Chip } from "@mui/material"; // Added Chip here
+import { Container, Typography, Card, CardContent, Button, Box, Snackbar, Alert, Divider, Chip, Paper } from "@mui/material";
 import { useUser } from '../contexts/UserContext';
 
 function MySignups() {
@@ -19,7 +19,7 @@ function MySignups() {
         async function fetchSignups() {
             const { data, error } = await supabase
                 .from("signups")
-                .select("id, status, events(name, date, location, description)")
+                .select("id, status, events(*, requires_approval)")
                 .eq("user_id", profile.id);
 
             if (error) {
@@ -27,7 +27,6 @@ function MySignups() {
             } else {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-
                 const upcoming = [];
                 const past = [];
 
@@ -53,7 +52,6 @@ function MySignups() {
             setSnackbar({ open: true, message: 'Failed to cancel signup.', severity: 'error' });
         } else {
             setSnackbar({ open: true, message: 'Signup canceled successfully!', severity: 'success' });
-            // Re-filter the signups locally instead of re-fetching
             setUpcomingSignups(prev => prev.filter(s => s.id !== signupId));
             setPastSignups(prev => prev.filter(s => s.id !== signupId));
         }
@@ -73,6 +71,17 @@ function MySignups() {
         setSnackbar({ ...snackbar, open: false });
     };
 
+    const getStatusLabel = (status) => {
+        if (status === 'Waiting List') return 'On Waitlist';
+        return status;
+    };
+
+    const getChipStyling = (status) => {
+        if (status === 'Confirmed') return { color: 'success' };
+        if (status === 'Cancelled') return { color: 'error' };
+        return { color: 'default', sx: { backgroundColor: '#757575', color: 'white' } };
+    };
+
     if (loading) return <Typography>Loading your signed-up events...</Typography>;
 
     const SignupCard = ({ signup, isUpcoming }) => {
@@ -85,7 +94,13 @@ function MySignups() {
                 <CardContent>
                     <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                         <Typography variant="h5">{events.name}</Typography>
-                        <Chip label={signup.status || 'Pending'} size="small" color={signup.status === 'Confirmed' ? 'success' : 'default'} />
+                        {events.requires_approval && (
+                            <Chip
+                                label={getStatusLabel(signup.status)}
+                                size="small"
+                                {...getChipStyling(signup.status)}
+                            />
+                        )}
                     </Box>
                     <Typography variant="body2" color="textSecondary">📍 {events.location || 'No location specified'}</Typography>
                     <Typography variant="body2" color="textSecondary">📅 {new Date(events.date).toLocaleDateString()}</Typography>
@@ -106,8 +121,25 @@ function MySignups() {
     };
 
     return (
-        <Container maxWidth="md">
-            <Typography variant="h4" gutterBottom>My Signups</Typography>
+        <Box>
+            <Paper
+                elevation={4}
+                sx={{
+                    p: { xs: 2, sm: 3 },
+                    mb: 4,
+                    borderRadius: 2,
+                    textAlign: 'center',
+                    background: 'linear-gradient(45deg, #2E7D32 30%, #4CAF50 90%)',
+                    color: 'white'
+                }}
+            >
+                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+                    My Signups
+                </Typography>
+                <Typography variant="subtitle1">
+                    Here are all the events you've signed up for, past and present.
+                </Typography>
+            </Paper>
 
             <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>Upcoming</Typography>
             {upcomingSignups.length > 0 ? (
@@ -130,7 +162,7 @@ function MySignups() {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </Container>
+        </Box>
     );
 }
 

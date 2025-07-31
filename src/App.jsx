@@ -10,7 +10,7 @@ import AuthForm from "./components/AuthForm";
 
 // 2. Convert  page components to be lazy-loaded
 const AccountSetup = lazy(() => import('./components/AccountSetup'));
-const Dashboard = lazy(() => import('./components/Dashboard'));
+const Events = lazy(() => import('./components/EventList.jsx'));
 const EventSignup = lazy(() => import('./components/EventSignup'));
 const MySignups = lazy(() => import('./components/MySignups'));
 const UpdatePassword = lazy(() => import('./components/ResetPassword'));
@@ -47,7 +47,7 @@ function AppContent() {
             <Route path="/setup" element={<AccountSetup />} />
             <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/access-denied" element={<AccessDenied />} />
-            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/Events" element={<Layout><Events /></Layout>} />
             <Route path="/signup/:eventId" element={<Layout><EventSignup /></Layout>} />
             <Route path="/mysignups" element={<Layout><MySignups /></Layout>} />
             <Route

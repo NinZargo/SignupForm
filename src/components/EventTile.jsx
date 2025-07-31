@@ -1,46 +1,30 @@
 import { useEffect, useState } from "react";
 import {
-    Card,
-    CardActionArea,
-    CardContent,
-    CardMedia,
-    Typography,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    List,
-    ListItem,
-    ListItemText,
-    Box,
-    FormControlLabel,
-    Checkbox,
-    Chip,
-    Snackbar,
-    Alert
+    Card, CardActionArea, CardContent, CardMedia, Typography, Dialog, DialogTitle,
+    DialogContent, DialogActions, Button, List, ListItem, ListItemText, Box,
+    FormControlLabel, Checkbox, Chip, Snackbar, Alert
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
-import { useUser } from '../contexts/UserContext'; // Using the global context
+import { useUser } from '../contexts/UserContext';
 
-function EventTile({ event, isInitiallySignedUp }) {
-    const { profile, isAdmin } = useUser(); // Get user data from the context
-
+function EventTile({ event, initialSignupStatus }) {
+    const { profile, isAdmin } = useUser();
     const [open, setOpen] = useState(false);
     const [signups, setSignups] = useState([]);
-    const [isSignedUp, setIsSignedUp] = useState(isInitiallySignedUp);
+    const [isSignedUp, setIsSignedUp] = useState(!!initialSignupStatus);
+    const [signupStatus, setSignupStatus] = useState(initialSignupStatus);
     const [canDrive, setCanDrive] = useState(false);
     const [needTransport, setNeedTransport] = useState(false);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
 
-    // This effect ensures the tile's signup status stays in sync
     useEffect(() => {
-        setIsSignedUp(isInitiallySignedUp);
-    }, [isInitiallySignedUp]);
+        setIsSignedUp(!!initialSignupStatus);
+        setSignupStatus(initialSignupStatus);
+    }, [initialSignupStatus]);
 
     const handleOpen = async () => {
         setOpen(true);
-        // fetchSignups is now correctly used here for admins
         if (isAdmin) {
             await fetchSignups();
         }
@@ -56,21 +40,22 @@ function EventTile({ event, isInitiallySignedUp }) {
             .from("signups")
             .select(`*, users:users!signups_user_id_fkey(id, name, email)`)
             .eq("event_id", event.id);
-
         if (error) console.error("Error fetching signups:", error);
         else setSignups(data || []);
     };
 
     const handleSignup = async () => {
-        if (!profile) return; // Use profile from context
+        if (!profile) return;
+
+        const initialStatus = event.requires_approval ? 'Waiting List' : 'Confirmed';
 
         const { error } = await supabase.from("signups").insert([
             {
-                user_id: profile.id, // Use profile.id from context
+                user_id: profile.id,
                 event_id: event.id,
                 can_drive: canDrive,
                 transport_needed: needTransport,
-                status: "Pending"
+                status: initialStatus
             },
         ]);
 
@@ -79,17 +64,47 @@ function EventTile({ event, isInitiallySignedUp }) {
             alert("Failed to sign up.");
         } else {
             handleClose();
-            setSnackbarOpen(true); // Correctly used to show the Snackbar
+            setSnackbarMessage(event.requires_approval ? 'Successfully added to waitlist!' : 'Successfully signed up!');
+            setSnackbarOpen(true);
             setIsSignedUp(true);
+            setSignupStatus(initialStatus);
         }
+    };
+
+    const getStatusLabel = () => {
+        if (signupStatus === 'Waiting List') return 'On Waitlist';
+        return signupStatus; // 'Confirmed' or 'Cancelled'
+    };
+
+    const getChipStyling = (status) => {
+        if (status === 'Confirmed') return { color: 'success' };
+        if (status === 'Cancelled') return { color: 'error' };
+        return { color: 'default', sx: { backgroundColor: '#757575', color: 'white' } };
     };
 
     return (
         <>
             <Card sx={{ mb: 2, position: 'relative' }}>
+                {/* --- FIX IS HERE --- */}
+                {/* This now correctly shows a chip for ANY event the user is signed up for. */}
                 {isSignedUp && (
-                    <Chip label="Signed Up" color="success" sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />
+                    event.requires_approval ? (
+                        // For waitlist events, show the detailed status chip
+                        <Chip
+                            label={getStatusLabel()}
+                            {...getChipStyling(signupStatus)}
+                            sx={{ ...getChipStyling(signupStatus).sx, position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                        />
+                    ) : (
+                        // For regular events, show a simple "Signed Up" chip
+                        <Chip
+                            label="Signed Up"
+                            color="success"
+                            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                        />
+                    )
                 )}
+                {/* --- END OF FIX --- */}
                 <CardActionArea onClick={handleOpen}>
                     <CardMedia
                         component="img"
@@ -115,26 +130,13 @@ function EventTile({ event, isInitiallySignedUp }) {
             >
                 <DialogTitle>{event.name}</DialogTitle>
                 <DialogContent>
-                    {event.image_url && (
-                        <CardMedia
-                            component="img"
-                            height="200"
-                            image={event.image_url}
-                            alt={event.name}
-                            sx={{ borderRadius: 2, marginBottom: 2 }}
-                        />
-                    )}
-                    <Typography variant="body1" gutterBottom>
-                        {event.description || "No description available."}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                        📅 {new Date(event.date).toLocaleDateString()}
-                    </Typography>
+                    {event.image_url && ( <CardMedia component="img" height="200" image={event.image_url} alt={event.name} sx={{ borderRadius: 2, marginBottom: 2 }} /> )}
+                    <Typography variant="body1" gutterBottom>{event.description || "No description available."}</Typography>
+                    <Typography variant="body2" color="textSecondary">📅 {new Date(event.date).toLocaleDateString()}</Typography>
+
                     {isAdmin && signups.length > 0 && (
                         <div>
-                            <Typography variant="h6" sx={{ mt: 2 }}>
-                                Signups: {signups.length}
-                            </Typography>
+                            <Typography variant="h6" sx={{ mt: 2 }}>Signups: {signups.length}</Typography>
                             <List>
                                 {signups.map((signup) => (
                                     <ListItem key={signup.users?.id || Math.random()}>
@@ -147,17 +149,11 @@ function EventTile({ event, isInitiallySignedUp }) {
                     {!isSignedUp && (
                         profile?.role === "Driver" ? (
                             <Box display="flex" justifyContent="center" mt={2}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={canDrive} onChange={(e) => setCanDrive(e.target.checked)} />}
-                                    label="I can drive"
-                                />
+                                <FormControlLabel control={<Checkbox checked={canDrive} onChange={(e) => setCanDrive(e.target.checked)} />} label="I can drive" />
                             </Box>
                         ) : (
                             <Box display="flex" justifyContent="center" mt={2}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={needTransport} onChange={(e) => setNeedTransport(e.target.checked)} />}
-                                    label="I need Transport"
-                                />
+                                <FormControlLabel control={<Checkbox checked={needTransport} onChange={(e) => setNeedTransport(e.target.checked)} />} label="I need Transport" />
                             </Box>
                         )
                     )}
@@ -165,9 +161,19 @@ function EventTile({ event, isInitiallySignedUp }) {
                 <DialogActions>
                     <Button onClick={handleClose}>Close</Button>
                     {isSignedUp ? (
-                        <Typography sx={{ mr: 2, color: 'success.main' }}>You are signed up!</Typography>
+                        event.requires_approval ? (
+                            <Chip
+                                label={getStatusLabel()}
+                                {...getChipStyling(signupStatus)}
+                                sx={{ ...getChipStyling(signupStatus).sx, mr: 2 }}
+                            />
+                        ) : (
+                            <Typography sx={{ mr: 2, color: 'success.main' }}>You are signed up!</Typography>
+                        )
                     ) : (
-                        <Button variant="contained" onClick={handleSignup}>Sign Up</Button>
+                        <Button variant="contained" onClick={handleSignup}>
+                            {event.requires_approval ? 'Request to Go' : 'Sign Up'}
+                        </Button>
                     )}
                 </DialogActions>
             </Dialog>
@@ -179,7 +185,7 @@ function EventTile({ event, isInitiallySignedUp }) {
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
                 <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%' }}>
-                    Successfully signed up!
+                    {snackbarMessage}
                 </Alert>
             </Snackbar>
         </>
