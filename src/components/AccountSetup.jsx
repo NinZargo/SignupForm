@@ -1,80 +1,140 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { Container, TextField, Button, Typography, Box, Alert, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 
 function AccountSetup() {
     const [name, setName] = useState("");
+    const [studentNumber, setStudentNumber] = useState("");
+    const [studentNumberError, setStudentNumberError] = useState("");
     const [role, setRole] = useState("");
     const [carSpaces, setCarSpaces] = useState("");
-    const [error, setError] = useState(null);
+    const [apiError, setApiError] = useState(null);
+    const [message, setMessage] = useState(""); // State for the instructional message
     const navigate = useNavigate();
+
+    // 1. Add a useEffect to fetch the user's current profile data on load
+    useEffect(() => {
+        async function loadProfile() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile) {
+                    // Pre-fill the form with any existing data
+                    setName(profile.name || "");
+                    setRole(profile.role || "");
+                    setStudentNumber(profile.student_number || "");
+
+                    // 2. Set the instructional message if the student number is missing
+                    if (!profile.student_number) {
+                        setMessage("Your profile is incomplete. Please add your student number to continue.");
+                    }
+                }
+            }
+        }
+        loadProfile();
+    }, []);
+
+    const validateStudentNumber = () => {
+        if (!/^\d{7}$/.test(studentNumber)) {
+            setStudentNumberError("Student number must be exactly 7 digits.");
+            return false;
+        }
+        const currentYearLastTwoDigits = new Date().getFullYear() % 100;
+        const studentYear = parseInt(studentNumber.substring(0, 2), 10);
+        if (studentYear > currentYearLastTwoDigits) {
+            setStudentNumberError(`The year prefix '${studentNumber.substring(0, 2)}' cannot be in the future.`);
+            return false;
+        }
+        setStudentNumberError("");
+        return true;
+    };
 
     const handleSetupComplete = async (e) => {
         e.preventDefault();
-        setError(null);
+        setApiError(null);
 
-        // Get authenticated user
-        const { data: user, error: userError } = await supabase.auth.getUser();
-        if (userError || !user || !user.user) {
-            setError("Error fetching authenticated user.");
+        if (!validateStudentNumber()) {
             return;
         }
 
-        const userId = user.user.id;
-        const email = user.user.email;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            setApiError("Error fetching authenticated user.");
+            return;
+        }
 
-        // Insert user into `users` table
-        const { error: insertError } = await supabase
+        const { error: upsertError } = await supabase
             .from("users")
-            .insert([{ id: userId, name, email, role}]);
+            .upsert({
+                id: user.id,
+                name,
+                email: user.email,
+                role,
+                student_number: studentNumber
+            });
 
-        if (insertError) {
-            setError(insertError.message);
+        if (upsertError) {
+            setApiError(upsertError.message);
             return;
         }
 
-        // If driver, insert into `drivers` table
         if (role === "Driver") {
             const { error: driverError } = await supabase
                 .from("cars")
-                .insert([{ driver_id: userId, car_spaces: parseInt(carSpaces) }]);
+                .upsert({ driver_id: user.id, car_spaces: parseInt(carSpaces) }, { onConflict: 'driver_id' });
 
             if (driverError) {
-                setError(driverError.message);
+                setApiError(driverError.message);
                 return;
             }
         }
 
-        const { error: updateError } = await supabase.auth.updateUser({
+        await supabase.auth.updateUser({
             data: { setup_complete: true }
         });
 
-        // Navigate to dashboard after successful setup
         navigate("/dashboard");
     };
 
     return (
         <Container maxWidth="false" sx={{ width: "100vw", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <Box sx={{ textAlign: "center", mt: 5, width: "40vw" }}>
-                <Typography variant="h4">Account Setup</Typography>
-                {error && <Alert severity="error">{error}</Alert>}
+            <Box sx={{ p: 3, boxShadow: 3, borderRadius: 2, textAlign: 'center', maxWidth: 400, width: '100%' }}>
+                <Typography variant="h4" gutterBottom>Account Setup</Typography>
+                {/* 3. Display the instructional message or API errors */}
+                {message && !apiError && <Alert severity="info" sx={{ my: 2 }}>{message}</Alert>}
+                {apiError && <Alert severity="error" sx={{ my: 2 }}>{apiError}</Alert>}
 
                 <form onSubmit={handleSetupComplete}>
                     <TextField fullWidth label="Full Name" required margin="normal" value={name} onChange={(e) => setName(e.target.value)} />
+                    <TextField
+                        fullWidth
+                        label="Student Number"
+                        required
+                        margin="normal"
+                        value={studentNumber}
+                        onChange={(e) => setStudentNumber(e.target.value)}
+                        error={!!studentNumberError}
+                        helperText={studentNumberError}
+                    />
                     <FormControl fullWidth required margin="normal">
-                        <InputLabel>Do you drive?</InputLabel>
+                        <InputLabel>Are you a driver?</InputLabel>
                         <Select value={role} onChange={(e) => setRole(e.target.value)}>
-                            <MenuItem value="Driver">Driver</MenuItem>
-                            <MenuItem value="Member">Non-Driver</MenuItem>
+                            <MenuItem value="Driver">Yes, I can drive</MenuItem>
+                            <MenuItem value="Member">No, I'm a passenger</MenuItem>
                         </Select>
                     </FormControl>
-
                     {role === "Driver" && (
                         <TextField
                             fullWidth
-                            label="How many spaces does your car have?"
+                            label="How many seats does your car have (including you)?"
                             type="number"
+                            required
                             variant="outlined"
                             margin="normal"
                             value={carSpaces}
@@ -82,7 +142,6 @@ function AccountSetup() {
                             inputProps={{ min: 1 }}
                         />
                     )}
-
                     <Button fullWidth variant="contained" type="submit" sx={{ mt: 2 }}>Complete Setup</Button>
                 </form>
             </Box>

@@ -4,7 +4,7 @@ import { TextField, Button, Container, Typography, Box, Alert } from '@mui/mater
 import { useNavigate } from 'react-router-dom';
 
 const AuthForm = () => {
-    const [formType, setFormType] = useState('signin'); // 'signin', 'signup', 'forgot'
+    const [formType, setFormType] = useState('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
@@ -16,35 +16,45 @@ const AuthForm = () => {
         setError(null);
         setMessage('');
 
-        let response;
         if (formType === 'signup') {
-            response = await supabase.auth.signUp({ email, password });
-        } else if (formType === 'signin') {
-            response = await supabase.auth.signInWithPassword({ email, password });
-        } else if (formType === 'forgot') {
-            response = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: 'https://NinZargo.github.io/SignupForm/#/reset-password'
-            });
-        }
-
-        if (response.error) {
-            setError(response.error.message);
-        } else {
-            if (formType === 'signup') {
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) {
+                setError(error.message);
+            } else {
                 setMessage('Signup successful! Check your email to confirm.');
-            } else if (formType === 'signin') {
-                const { user } = response.data;
+            }
+        } else if (formType === 'signin') {
+            // --- THIS IS THE UPDATED SECTION ---
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-                if (user) {
-                    console.log(user.user_metadata);
-                    const { setup_complete } = user.user_metadata || {};
+            if (error) {
+                setError(error.message);
+            } else if (data.user) {
+                // After login, check the public.users table for a student number.
+                const { data: profile, error: profileError } = await supabase
+                    .from('users')
+                    .select('student_number')
+                    .eq('id', data.user.id)
+                    .single();
 
-                    if (!setup_complete) {
-                        navigate('/setup'); // Redirect to account setup
-                    } else {
-                        navigate('/dashboard'); // Redirect to dashboard
-                    }
+                // If a profile exists and has a student number, go to the dashboard.
+                if (profile && profile.student_number) {
+                    navigate('/dashboard');
+                } else {
+                    // Otherwise, force the user to the setup page to add it.
+                    // This also handles cases where a profile doesn't exist yet.
+                    navigate('/setup');
                 }
+            }
+            // --- END OF UPDATED SECTION ---
+        } else if (formType === 'forgot') {
+            const redirectURL = `${window.location.origin}/SignUpForm/#/`;
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: redirectURL,
+            });
+
+            if (error) {
+                setError(error.message);
             } else {
                 setMessage('Password reset email sent! Check your inbox.');
             }
@@ -74,7 +84,7 @@ const AuthForm = () => {
                 <Typography variant="body2" sx={{ mt: 2 }}>
                     {formType === 'signin' && (
                         <>
-                            Don&#39;t have an account? <Button variant="text" onClick={() => setFormType('signup')}>Sign Up</Button>
+                            Don't have an account? <Button variant="text" onClick={() => setFormType('signup')}>Sign Up</Button>
                             <br />
                             <Button variant="text" onClick={() => setFormType('forgot')}>Forgot Password?</Button>
                         </>

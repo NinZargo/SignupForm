@@ -29,8 +29,8 @@ function UpdatePassword() {
     };
 
     return (
-        <Container maxWidth="xs">
-            <Box sx={{ mt: 8, textAlign: 'center' }}>
+        <Container maxWidth="false" sx={{ width: "100vw", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <Box sx={{ textAlign: 'center', p: 3, border: '1px solid #ddd', borderRadius: 2, maxWidth: '500px' }}>
                 <Typography variant="h4" gutterBottom>
                     Update Your Password
                 </Typography>
