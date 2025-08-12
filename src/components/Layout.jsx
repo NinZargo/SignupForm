@@ -1,37 +1,67 @@
 import { useState } from "react";
-import { AppBar, Toolbar, Button, Box, IconButton, Drawer, List, ListItem, ListItemButton, ListItemText, Paper } from "@mui/material";
+import {
+    AppBar,
+    Toolbar,
+    Button,
+    Box,
+    IconButton,
+    Drawer,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemButton,
+    Divider,
+    Stack,
+    Paper
+} from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from '../contexts/UserContext';
+import { supabase } from "../supabaseClient";
 
 function Layout({ children }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
     const { isAdmin } = useUser();
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate('/');
+    };
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
 
-    const baseNavItems = ["Events", "MySignups"];
-    const navItems = isAdmin ? [...baseNavItems, "Admin"] : baseNavItems;
+    // Use an array of objects for clearer navigation paths
+    const baseNavItems = [
+        { label: 'Events', path: '/events' },
+        { label: 'MySignups', path: '/mysignups' }
+    ];
+    const navItems = isAdmin ? [...baseNavItems, { label: 'Admin', path: '/admin' }] : baseNavItems;
 
     const drawer = (
         <Box onClick={handleDrawerToggle} sx={{ textAlign: "center" }}>
             <List>
                 {navItems.map((item) => (
-                    <ListItem key={item} disablePadding>
-                        <ListItemButton sx={{ textAlign: 'center' }} onClick={() => navigate(`/${item.toLowerCase()}`)}>
-                            <ListItemText primary={item} />
+                    <ListItem key={item.label} disablePadding>
+                        <ListItemButton sx={{ textAlign: 'center' }} onClick={() => navigate(item.path)}>
+                            <ListItemText primary={item.label} />
                         </ListItemButton>
                     </ListItem>
                 ))}
+                <Divider />
+                <ListItem disablePadding>
+                    <ListItemButton sx={{ textAlign: 'center' }} onClick={handleLogout}>
+                        <ListItemText primary="Logout" />
+                    </ListItemButton>
+                </ListItem>
             </List>
         </Box>
     );
 
     return (
-        // The root Box now has the subtle pattern background
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
@@ -42,13 +72,38 @@ function Layout({ children }) {
         }}>
             <AppBar position="static" sx={{ bgcolor: "white", boxShadow: "none", borderBottom: "1px solid #ddd" }}>
                 <Toolbar sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: { xs: "10px", sm: "10px 20px" } }}>
-                    <Box component="img" src="https://assets.zyrosite.com/m5KbJakbLpivbpzd/ai-logo-A1aJq39wW9HGqzvO.svg" alt="Brunel Sailing logo" sx={{ height: "40px", cursor: "pointer" }} onClick={() => navigate("/")} />
-                    <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 2 }}>
-                        {navItems.map((label) => (
-                            <Button key={label} sx={{ color: "black", textTransform: "none" }} onClick={() => navigate(`/${label.toLowerCase()}`)}>
-                                {label}
-                            </Button>
-                        ))}
+                    <Box component="img" src="https://assets.zyrosite.com/m5KbJakbLpivbpzd/ai-logo-A1aJq39wW9HGqzvO.svg" alt="Brunel Sailing logo" sx={{ height: "40px", cursor: "pointer" }} onClick={() => navigate("/events")} />
+                    <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: 'center', gap: 1 }}>
+                        <Stack direction="row" spacing={1} divider={<Divider orientation="vertical" flexItem sx={{ height: '20px', alignSelf: 'center' }} />}>
+                            {navItems.map((item) => {
+                                const isActive = location.pathname === item.path;
+                                return (
+                                    <Button
+                                        key={item.label}
+                                        onClick={() => navigate(item.path)}
+                                        sx={{
+                                            color: isActive ? 'primary.main' : 'black',
+                                            fontWeight: isActive ? 'bold' : 'normal',
+                                            backgroundColor: isActive ? 'action.hover' : 'transparent',
+                                            textTransform: "none",
+                                            '&:hover': {
+                                                backgroundColor: 'action.hover'
+                                            }
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                )
+                            })}
+                        </Stack>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={handleLogout}
+                            sx={{ textTransform: 'none', ml: 2 }}
+                        >
+                            Logout
+                        </Button>
                     </Box>
                     <IconButton color="inherit" aria-label="open drawer" edge="end" onClick={handleDrawerToggle} sx={{ display: { sm: "none" }, color: "black" }}>
                         <MenuIcon />
@@ -71,7 +126,7 @@ function Layout({ children }) {
                     sx={{
                         width: '100%',
                         maxWidth: '1200px',
-                        backgroundColor: 'white', // Changed to solid white for better contrast
+                        backgroundColor: 'white',
                         borderRadius: 2,
                         p: 3,
                     }}
