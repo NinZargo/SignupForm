@@ -1,0 +1,1 @@
+import{j as e,B as a,o,a4 as i}from"./vendor-mLxMphKg.js";import{u as n}from"./index-COGqSMdW.js";function c({children:t}){const{isAdmin:r,loading:s}=n();return s?e.jsx(a,{sx:{display:"flex",justifyContent:"center",alignItems:"center",height:"80vh"},children:e.jsx(o,{})}):r?t:e.jsx(i,{to:"/dashboard",replace:!0})}export{c as default};
