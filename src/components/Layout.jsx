@@ -12,7 +12,8 @@ import {
     ListItemButton,
     Divider,
     Stack,
-    Paper
+    Paper,
+    Typography
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -72,7 +73,32 @@ function Layout({ children }) {
         }}>
             <AppBar position="static" sx={{ bgcolor: "white", boxShadow: "none", borderBottom: "1px solid #ddd" }}>
                 <Toolbar sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: { xs: "10px", sm: "10px 20px" } }}>
-                    <Box component="img" src="https://assets.zyrosite.com/m5KbJakbLpivbpzd/ai-logo-A1aJq39wW9HGqzvO.svg" alt="Brunel Sailing logo" sx={{ height: "40px", cursor: "pointer" }} onClick={() => navigate("/events")} />
+                    <Box
+                        sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1.5 }}
+                        onClick={() => navigate("/events")}
+                    >
+                        <Box
+                            component="img"
+                            src="/BrunelSailingIcon.jpeg" // Make sure this is your local logo file
+                            alt="Brunel Sailing logo"
+                            sx={{ height: "40px" }}
+                        />
+                        <Typography
+                            variant="h6"
+                            component="div"
+                            sx={{
+                                fontFamily: "'Helvetica Neue', Arial, sans-serif",
+                                fontWeight: 'bold',
+                                fontSize: '2rem',
+                                letterSpacing: -1,
+                                // You will need to find the exact hex code for Brunel Sailing's blue
+                                color: '#003c71', // This is a placeholder for Brunel University blue
+                                display: { xs: 'none', sm: 'block' } // Hides text on very small screens
+                            }}
+                        >
+                            Brunel Sailing
+                        </Typography>
+                    </Box>
                     <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: 'center', gap: 1 }}>
                         <Stack direction="row" spacing={1} divider={<Divider orientation="vertical" flexItem sx={{ height: '20px', alignSelf: 'center' }} />}>
                             {navItems.map((item) => {
