@@ -38,6 +38,7 @@ const convertToCSV = (data, eventName, eventDate) => {
 };
 
 function AdminPage() {
+    const [weeklySessions, setWeeklySessions] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
     const [pastEvents, setPastEvents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -45,23 +46,30 @@ function AdminPage() {
 
     async function fetchAdminData() {
         try {
-            const { data, error } = await supabase.rpc('get_event_transport_details');
-            if (error) throw error;
+            // Fetch both events and session details at the same time
+            const [eventsResponse, sessionsResponse] = await Promise.all([
+                supabase.rpc('get_event_transport_details'),
+                supabase.rpc('get_session_transport_details')
+            ]);
 
+            if (eventsResponse.error) throw eventsResponse.error;
+            if (sessionsResponse.error) throw sessionsResponse.error;
+
+            // Set the data for weekly sessions
+            setWeeklySessions(sessionsResponse.data || []);
+
+            // Your original logic for splitting events into upcoming and past
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-
             const upcoming = [];
             const past = [];
-
-            (data || []).forEach(event => {
+            (eventsResponse.data || []).forEach(event => {
                 if (new Date(event.event_date) >= today) {
                     upcoming.push(event);
                 } else {
                     past.push(event);
                 }
             });
-
             setUpcomingEvents(upcoming.sort((a, b) => new Date(a.event_date) - new Date(b.event_date)));
             setPastEvents(past.sort((a, b) => new Date(b.event_date) - new Date(a.event_date)));
 
@@ -108,23 +116,56 @@ function AdminPage() {
         document.body.removeChild(link);
     };
 
-    const renderEvent = (event) => (
-        <Paper key={event.event_id} sx={{ mb: 3, p: 3, boxShadow: 3, borderRadius: 2 }}>
+    const handleCacheOldImages = async () => {
+        alert("Starting image caching process. This may take a few moments. Check the console for progress.");
+        const { data: oldEvents, error: fetchError } = await supabase
+            .from('events')
+            .select('id, image_url')
+            .like('image_url', 'http%');
+        if (fetchError) return alert(`Error fetching old events: ${fetchError.message}`);
+        if (oldEvents.length === 0) return alert("No old images to cache!");
+        console.log(`Found ${oldEvents.length} events to migrate.`);
+        for (const event of oldEvents) {
+            try {
+                console.log(`Caching image for event ID: ${event.id}`);
+                const response = await fetch(event.image_url);
+                const imageBlob = await response.blob();
+                const fileName = `${Date.now()}_${event.id}.jpeg`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('event-images')
+                    .upload(fileName, imageBlob);
+                if (uploadError) throw uploadError;
+                const { error: updateError } = await supabase
+                    .from('events')
+                    .update({ image_url: uploadData.path })
+                    .eq('id', event.id);
+                if (updateError) throw updateError;
+                console.log(`Successfully cached image for event ID: ${event.id}`);
+            } catch (error) {
+                console.error(`Failed to cache image for event ${event.id}:`, error);
+            }
+        }
+        alert("Image caching process complete! Please refresh the page.");
+    };
+
+    // This function now renders both events and sessions, as they share the same data structure
+    const renderActivity = (activity) => (
+        <Paper key={activity.event_id} sx={{ mb: 3, p: 3, boxShadow: 3, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <Typography variant="h5">{event.event_name}</Typography>
-                    <Typography variant="body2" color="textSecondary">{new Date(event.event_date).toLocaleDateString()}</Typography>
+                    <Typography variant="h5">{activity.event_name}</Typography>
+                    <Typography variant="body2" color="textSecondary">{new Date(activity.event_date).toLocaleDateString()}</Typography>
                 </div>
-                <Button variant="outlined" size="small" onClick={() => handleExport(event)}>
+                <Button variant="outlined" size="small" onClick={() => handleExport(activity)}>
                     Export Signups
                 </Button>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, my: 2 }}>
-                <Chip label={`Total Signups: ${event.total_signups}`} />
-                <Chip label={`Passengers Needing Lifts: ${event.passengers_needing_lifts}`} />
+                <Chip label={`Total Signups: ${activity.total_signups}`} />
+                <Chip label={`Passengers Needing Lifts: ${activity.passengers_needing_lifts}`} />
                 <Chip
-                    label={`Available Passenger Spaces: ${event.available_passenger_spaces}`}
-                    color={event.available_passenger_spaces >= event.passengers_needing_lifts ? 'success' : 'error'}
+                    label={`Available Passenger Spaces: ${activity.available_passenger_spaces}`}
+                    color={activity.available_passenger_spaces >= activity.passengers_needing_lifts ? 'success' : 'error'}
                 />
             </Box>
             <Accordion sx={{ boxShadow: 'none' }}>
@@ -133,11 +174,11 @@ function AdminPage() {
                 </AccordionSummary>
                 <AccordionDetails>
                     <List dense>
-                        {event.members && event.members.map(member => (
+                        {activity.members && activity.members.map(member => (
                             <ListItem
-                                key={member.signup_id}
+                                key={member.signup_id || member.user_id}
                                 secondaryAction={
-                                    event.requires_approval && ['Waiting List', 'Pending'].includes(member.status) && (
+                                    activity.requires_approval && ['Waiting List', 'Pending'].includes(member.status) && (
                                         <>
                                             <IconButton edge="end" title="Confirm" onClick={() => updateSignupStatus(member.signup_id, 'Confirmed')}>
                                                 <CheckCircleIcon color="success" />
@@ -152,7 +193,7 @@ function AdminPage() {
                                 <ListItemText
                                     primary={member.name}
                                     secondary={
-                                        (event.requires_approval ? `Status: ${member.status} | ` : '') +
+                                        (activity.requires_approval ? `Status: ${member.status} | ` : '') +
                                         `Student No: ${member.student_number || 'N/A'}` +
                                         ` | Role: ${member.role}` +
                                         (member.can_drive ? ` | Driving (${member.car_spaces} total seats)` : '') +
@@ -172,35 +213,30 @@ function AdminPage() {
 
     return (
         <Box>
-            <Paper
-                elevation={4}
-                sx={{
-                    p: { xs: 2, sm: 3 },
-                    mb: 4,
-                    borderRadius: 2,
-                    textAlign: 'center',
-                    background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)', // A red gradient for admin
-                    color: 'white'
-                }}
-            >
-                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-                    Admin Dashboard
-                </Typography>
-                <Typography variant="subtitle1">
-                    Manage event signups, transport, and member approvals.
-                </Typography>
+            <Paper elevation={4} sx={{ p: { xs: 2, sm: 3 }, mb: 4, borderRadius: 2, textAlign: 'center', background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)', color: 'white' }}>
+                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>Admin Dashboard</Typography>
+                <Typography variant="subtitle1">Manage event signups, transport, and member approvals.</Typography>
             </Paper>
+
+            <Button variant="contained" color="warning" onClick={handleCacheOldImages}>Cache Old Images</Button>
+
+            <Box sx={{ my: 4 }}>
+                <Typography variant="h5" gutterBottom>Weekly Sessions (This Week)</Typography>
+                {weeklySessions.length > 0 ? weeklySessions.map(renderActivity) : <Typography>No signups for sessions this week.</Typography>}
+            </Box>
+
+            <Divider />
 
             <Box sx={{ my: 4 }}>
                 <Typography variant="h5" gutterBottom>Upcoming Events</Typography>
-                {upcomingEvents.length > 0 ? upcomingEvents.map(renderEvent) : <Typography>No upcoming events with signups.</Typography>}
+                {upcomingEvents.length > 0 ? upcomingEvents.map(renderActivity) : <Typography>No upcoming events with signups.</Typography>}
             </Box>
 
             <Divider />
 
             <Box sx={{ my: 4 }}>
                 <Typography variant="h5" gutterBottom>Past Events</Typography>
-                {pastEvents.length > 0 ? pastEvents.map(renderEvent) : <Typography>No past events with signups.</Typography>}
+                {pastEvents.length > 0 ? pastEvents.map(renderActivity) : <Typography>No past events with signups.</Typography>}
             </Box>
         </Box>
     );
