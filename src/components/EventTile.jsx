@@ -10,6 +10,7 @@ import { useUser } from '../contexts/UserContext';
 function EventTile({ event, initialSignupStatus }) {
     const { profile, isAdmin } = useUser();
     const [open, setOpen] = useState(false);
+    const [signupCount, setSignupCount] = useState(0);
     const [signups, setSignups] = useState([]);
     const [isSignedUp, setIsSignedUp] = useState(!!initialSignupStatus);
     const [signupStatus, setSignupStatus] = useState(initialSignupStatus);
@@ -36,12 +37,12 @@ function EventTile({ event, initialSignupStatus }) {
     };
 
     const fetchSignups = async () => {
-        const { data, error } = await supabase
+        const { count, error } = await supabase
             .from("signups")
-            .select(`*, users:users!signups_user_id_fkey(id, name, email)`)
+            .select("*", { count: "exact", head: true })
             .eq("event_id", event.id);
         if (error) console.error("Error fetching signups:", error);
-        else setSignups(data || []);
+        else setSignupCount(count || 0);
     };
 
     const handleSignup = async () => {
@@ -134,16 +135,9 @@ function EventTile({ event, initialSignupStatus }) {
                     <Typography variant="body1" gutterBottom>{event.description || "No description available."}</Typography>
                     <Typography variant="body2" color="textSecondary">📅 {new Date(event.date).toLocaleDateString()}</Typography>
 
-                    {isAdmin && signups.length > 0 && (
+                    {isAdmin && signupCount > 0 && (
                         <div>
-                            <Typography variant="h6" sx={{ mt: 2 }}>Signups: {signups.length}</Typography>
-                            <List>
-                                {signups.map((signup) => (
-                                    <ListItem key={signup.users?.id || Math.random()}>
-                                        <ListItemText primary={signup.users?.name || `Unknown User`} />
-                                    </ListItem>
-                                ))}
-                            </List>
+                            <Typography variant="h6" sx={{ mt: 2 }}>Signups: {signupCount}</Typography>
                         </div>
                     )}
                     {!isSignedUp && (
