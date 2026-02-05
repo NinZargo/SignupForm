@@ -44,9 +44,9 @@ function EventTile({ event, initialSignupStatus }) {
 
     const handleOpen = async () => {
         setOpen(true);
-        if (isAdmin) {
-            await fetchSignups();
-        }
+        //if (isAdmin) {
+            //await fetchSignups();
+        //}
     };
 
     const handleClose = () => {
@@ -54,6 +54,8 @@ function EventTile({ event, initialSignupStatus }) {
         setOpen(false);
     };
 
+    /*
+    // Fetch signups for this event from Supabase. Removed due to error with RLS
     const fetchSignups = async () => {
         const { data, error } = await supabase
             .from("signups")
@@ -62,6 +64,7 @@ function EventTile({ event, initialSignupStatus }) {
         if (error) console.error("Error fetching signups:", error);
         else setSignups(data || []);
     };
+    */
 
     const handleSignup = async () => {
         if (!profile) return;
