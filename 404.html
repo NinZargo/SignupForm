@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (function() {
+        var href = window.location.href;
+        var hash = window.location.hash;
+        var path = window.location.pathname;
+
+        // 1. Handle GitHub Pages 404 on /update-password or subpaths
+        if (path === '/update-password' || path === '/update-password/') {
+          window.location.replace(window.location.origin + '/#/update-password');
+          return;
+        }
+
+        // 2. Handle recovery tokens
+        if (href.indexOf('type=recovery') !== -1 || hash.indexOf('type=recovery') !== -1) {
+          window.location.replace(window.location.origin + '/#/update-password');
+          return;
+        }
+
+        // Default SPA fallback
+        if (path !== '/' && path !== '/index.html') {
+          window.location.replace(window.location.origin + '/#' + path + hash);
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/jpeg" href="/BrunelSailingIcon.jpeg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brunel Sailing | Signup</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
