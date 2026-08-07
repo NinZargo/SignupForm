@@ -82,46 +82,4 @@ if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.
         })
     );
   });
-
-  // Handle notification clicks
-  self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
-    const targetUrl = event.notification.data?.url || '/#/';
-
-    event.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) {
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
-            client.focus();
-            if ('navigate' in client) {
-              client.navigate(targetUrl);
-            }
-            return;
-          }
-        }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl);
-        }
-      })
-    );
-  });
-
-  // Handle Push notifications from Web Push API
-  self.addEventListener('push', (event) => {
-    if (!event.data) return;
-    try {
-      const data = event.data.json();
-      const title = data.title || 'Brunel Sailing Alert';
-      const options = {
-        body: data.body || '',
-        icon: '/BrunelSailingIcon.jpeg',
-        badge: '/BrunelSailingIcon.jpeg',
-        data: { url: data.url || '/#/' },
-        vibrate: [200, 100, 200]
-      };
-      event.waitUntil(self.registration.showNotification(title, options));
-    } catch (err) {
-      console.error('Push notification error:', err);
-    }
-  });
 }
