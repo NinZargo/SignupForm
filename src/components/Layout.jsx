@@ -13,11 +13,16 @@ import {
     Divider,
     Stack,
     Paper,
-    Typography
+    Typography,
+    Tooltip,
+    useTheme
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from '../contexts/UserContext';
+import { useColorMode } from '../contexts/ThemeContext';
 import { supabase } from "../supabaseClient";
 
 function Layout({ children }) {
@@ -25,6 +30,8 @@ function Layout({ children }) {
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
     const { isAdmin } = useUser();
+    const { toggleColorMode } = useColorMode();
+    const theme = useTheme();
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -35,10 +42,9 @@ function Layout({ children }) {
         setMobileOpen(!mobileOpen);
     };
 
-    // Use an array of objects for clearer navigation paths
     const baseNavItems = [
         { label: 'Events', path: '/events' },
-        { label: 'MySignups', path: '/mysignups' }
+        { label: 'My Signups', path: '/mysignups' }
     ];
     const navItems = isAdmin ? [...baseNavItems, { label: 'Admin', path: '/admin' }] : baseNavItems;
 
@@ -54,6 +60,11 @@ function Layout({ children }) {
                 ))}
                 <Divider />
                 <ListItem disablePadding>
+                    <ListItemButton sx={{ textAlign: 'center' }} onClick={toggleColorMode}>
+                        <ListItemText primary={theme.palette.mode === 'dark' ? 'Light Mode' : 'Dark Mode'} />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
                     <ListItemButton sx={{ textAlign: 'center' }} onClick={handleLogout}>
                         <ListItemText primary="Logout" />
                     </ListItemButton>
@@ -68,10 +79,9 @@ function Layout({ children }) {
             flexDirection: 'column',
             minHeight: '100vh',
             width: '100vw',
-            backgroundColor: '#f4f6f8',
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='%23dce4ec' fill-opacity='1'%3E%3Cpolygon fill-rule='evenodd' points='8 4 12 6 8 8 6 12 4 8 0 6 4 4 6 0 8 4'/%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundColor: 'background.default',
         }}>
-            <AppBar position="static" sx={{ bgcolor: "white", boxShadow: "none", borderBottom: "1px solid #ddd" }}>
+            <AppBar position="static" color="default" sx={{ boxShadow: "0 2px 10px rgba(0,0,0,0.08)" }}>
                 <Toolbar sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: { xs: "10px", sm: "10px 20px" } }}>
                     <Box
                         sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1.5 }}
@@ -79,26 +89,26 @@ function Layout({ children }) {
                     >
                         <Box
                             component="img"
-                            src="/BrunelSailingIcon.jpeg" // Make sure this is your local logo file
+                            src="/BrunelSailingIcon.jpeg"
                             alt="Brunel Sailing logo"
-                            sx={{ height: "40px" }}
+                            sx={{ height: "40px", borderRadius: 1 }}
                         />
                         <Typography
                             variant="h6"
                             component="div"
                             sx={{
-                                fontFamily: "'Helvetica Neue', Arial, sans-serif",
-                                fontWeight: 'bold',
-                                fontSize: '2rem',
-                                letterSpacing: -1,
-                                // You will need to find the exact hex code for Brunel Sailing's blue
-                                color: '#003c71', // This is a placeholder for Brunel University blue
-                                display: { xs: 'none', sm: 'block' } // Hides text on very small screens
+                                fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+                                fontWeight: 800,
+                                fontSize: '1.8rem',
+                                letterSpacing: -0.5,
+                                color: theme.palette.mode === 'dark' ? '#90caf9' : '#0d47a1',
+                                display: { xs: 'none', sm: 'block' }
                             }}
                         >
                             Brunel Sailing
                         </Typography>
                     </Box>
+
                     <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: 'center', gap: 1 }}>
                         <Stack direction="row" spacing={1} divider={<Divider orientation="vertical" flexItem sx={{ height: '20px', alignSelf: 'center' }} />}>
                             {navItems.map((item) => {
@@ -108,10 +118,12 @@ function Layout({ children }) {
                                         key={item.label}
                                         onClick={() => navigate(item.path)}
                                         sx={{
-                                            color: isActive ? 'primary.main' : 'black',
+                                            color: isActive ? 'primary.main' : 'text.primary',
                                             fontWeight: isActive ? 'bold' : 'normal',
-                                            backgroundColor: isActive ? 'action.hover' : 'transparent',
+                                            backgroundColor: isActive ? 'action.selected' : 'transparent',
                                             textTransform: "none",
+                                            borderRadius: 2,
+                                            px: 2,
                                             '&:hover': {
                                                 backgroundColor: 'action.hover'
                                             }
@@ -119,23 +131,37 @@ function Layout({ children }) {
                                     >
                                         {item.label}
                                     </Button>
-                                )
+                                );
                             })}
                         </Stack>
+
+                        <Tooltip title={theme.palette.mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                            <IconButton onClick={toggleColorMode} color="inherit" sx={{ ml: 1 }}>
+                                {theme.palette.mode === 'dark' ? <Brightness7Icon color="warning" /> : <Brightness4Icon />}
+                            </IconButton>
+                        </Tooltip>
+
                         <Button
                             variant="outlined"
                             color="error"
                             onClick={handleLogout}
-                            sx={{ textTransform: 'none', ml: 2 }}
+                            sx={{ textTransform: 'none', ml: 1, borderRadius: 2 }}
                         >
                             Logout
                         </Button>
                     </Box>
-                    <IconButton color="inherit" aria-label="open drawer" edge="end" onClick={handleDrawerToggle} sx={{ display: { sm: "none" }, color: "black" }}>
-                        <MenuIcon />
-                    </IconButton>
+
+                    <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center' }}>
+                        <IconButton onClick={toggleColorMode} color="inherit">
+                            {theme.palette.mode === 'dark' ? <Brightness7Icon color="warning" /> : <Brightness4Icon />}
+                        </IconButton>
+                        <IconButton color="inherit" aria-label="open drawer" edge="end" onClick={handleDrawerToggle}>
+                            <MenuIcon />
+                        </IconButton>
+                    </Box>
                 </Toolbar>
             </AppBar>
+
             <Drawer variant="temporary" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: "block", sm: "none" }, "& .MuiDrawer-paper": { boxSizing: "border-box", width: "60%" } }}>
                 {drawer}
             </Drawer>
@@ -148,13 +174,12 @@ function Layout({ children }) {
                 justifyContent: 'center'
             }}>
                 <Paper
-                    elevation={3}
+                    elevation={2}
                     sx={{
                         width: '100%',
                         maxWidth: '1200px',
-                        backgroundColor: 'white',
-                        borderRadius: 2,
-                        p: 3,
+                        borderRadius: 3,
+                        p: { xs: 2, sm: 4 },
                     }}
                 >
                     {children}

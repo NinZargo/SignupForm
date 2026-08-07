@@ -16,15 +16,24 @@ import {
     Divider,
     FormControlLabel,
     Switch,
-    Grid
+    Grid,
+    Tabs,
+    Tab
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import DownloadIcon from '@mui/icons-material/Download';
+import EventIcon from '@mui/icons-material/Event';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import HistoryIcon from '@mui/icons-material/History';
 import HeaderBanner from './HeaderBanner.jsx';
 
 const convertToCSV = (data, eventName, eventDate) => {
-    const headers = ['Event Name', 'Event Date', 'Member Name', 'Student Number', 'Role', 'Can Drive', 'Needs Transport', 'Status'];
+    const headers = [
+        'Event Name', 'Event Date', 'Member Name', 'Student Number', 'Role',
+        'Can Drive', 'Needs Transport', 'Status', 'Emergency Contact', 'Emergency Phone', 'Medical Notes'
+    ];
     const rows = data.map(member =>
         [
             `"${eventName}"`,
@@ -32,9 +41,12 @@ const convertToCSV = (data, eventName, eventDate) => {
             `"${member.name}"`,
             `"${member.student_number || ''}"`,
             `"${member.role}"`,
-            member.can_drive,
-            member.transport_needed,
-            `"${member.status}"`
+            member.can_drive ? 'Yes' : 'No',
+            member.transport_needed ? 'Yes' : 'No',
+            `"${member.status}"`,
+            `"${member.emergency_contact_name || ''}"`,
+            `"${member.emergency_contact_phone || ''}"`,
+            `"${member.medical_notes || ''}"`
         ].join(',')
     );
     return [headers.join(','), ...rows].join('\n');
@@ -45,6 +57,7 @@ function AdminPage() {
     const [sessionConfigs, setSessionConfigs] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
     const [pastEvents, setPastEvents] = useState([]);
+    const [tabValue, setTabValue] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -93,7 +106,6 @@ function AdminPage() {
 
     const toggleSessionActive = async (sessionId, currentActive) => {
         const newStatus = currentActive === false ? true : false;
-
         setSessionConfigs(prev => prev.map(s => s.id === sessionId ? { ...s, is_active: newStatus } : s));
 
         const { data, error } = await supabase
@@ -103,7 +115,7 @@ function AdminPage() {
             .select();
 
         if (error || !data || data.length === 0) {
-            alert('Database RLS Error: Row-level security on table "sessions" blocked update. Please run the UPDATE policy in Supabase.');
+            alert('Database RLS Error: Row-level security on table "sessions" blocked update.');
             await fetchAdminData();
         } else {
             await fetchAdminData();
@@ -149,10 +161,8 @@ function AdminPage() {
             .like('image_url', 'http%');
         if (fetchError) return alert(`Error fetching old events: ${fetchError.message}`);
         if (oldEvents.length === 0) return alert("No old images to cache!");
-        console.log(`Found ${oldEvents.length} events to migrate.`);
         for (const event of oldEvents) {
             try {
-                console.log(`Caching image for event ID: ${event.id}`);
                 const response = await fetch(event.image_url);
                 const imageBlob = await response.blob();
                 const fileName = `${Date.now()}_${event.id}.jpeg`;
@@ -160,12 +170,7 @@ function AdminPage() {
                     .from('event-images')
                     .upload(fileName, imageBlob);
                 if (uploadError) throw uploadError;
-                const { error: updateError } = await supabase
-                    .from('events')
-                    .update({ image_url: uploadData.path })
-                    .eq('id', event.id);
-                if (updateError) throw updateError;
-                console.log(`Successfully cached image for event ID: ${event.id}`);
+                await supabase.from('events').update({ image_url: uploadData.path }).eq('id', event.id);
             } catch (err) {
                 console.error(`Failed to cache image for event ${event.id}:`, err);
             }
@@ -174,57 +179,79 @@ function AdminPage() {
     };
 
     const renderActivity = (activity) => (
-        <Paper key={activity.event_id} sx={{ mb: 3, p: 3, boxShadow: 3, borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Paper key={activity.event_id} elevation={3} sx={{ mb: 3, p: 3, borderRadius: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                 <div>
-                    <Typography variant="h5">{activity.event_name}</Typography>
-                    <Typography variant="body2" color="textSecondary">{new Date(activity.event_date).toLocaleDateString()}</Typography>
+                    <Typography variant="h5" fontWeight="bold">{activity.event_name}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                        📅 {new Date(activity.event_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Typography>
                 </div>
-                <Button variant="outlined" size="small" onClick={() => handleExport(activity)}>
-                    Export Signups
+                <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={() => handleExport(activity)}>
+                    Export Roster (CSV)
                 </Button>
             </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, my: 2 }}>
-                <Chip label={`Total Signups: ${activity.total_signups}`} />
-                <Chip label={`Passengers Needing Lifts: ${activity.passengers_needing_lifts}`} />
+
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, my: 2 }}>
+                <Chip label={`Total Signups: ${activity.total_signups}`} color="primary" variant="outlined" />
+                <Chip label={`Lifts Needed: ${activity.passengers_needing_lifts}`} color="warning" variant="outlined" />
                 <Chip
-                    label={`Available Passenger Spaces: ${activity.available_passenger_spaces}`}
+                    label={`Available Driver Seats: ${activity.available_passenger_spaces}`}
                     color={activity.available_passenger_spaces >= activity.passengers_needing_lifts ? 'success' : 'error'}
                 />
             </Box>
-            <Accordion sx={{ boxShadow: 'none' }}>
+
+            <Accordion elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: '8px !important' }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography>View Signed-up Members</Typography>
+                    <Typography fontWeight="bold">View Attendee Roster & Medical Details ({activity.members?.length || 0})</Typography>
                 </AccordionSummary>
-                <AccordionDetails>
+                <AccordionDetails sx={{ p: 0 }}>
                     <List dense>
-                        {activity.members && activity.members.map(member => (
-                            <ListItem
-                                key={member.signup_id || member.user_id}
-                                secondaryAction={
-                                    activity.requires_approval && ['Waiting List', 'Pending'].includes(member.status) && (
-                                        <>
-                                            <IconButton edge="end" title="Confirm" onClick={() => updateSignupStatus(member.signup_id, 'Confirmed')}>
-                                                <CheckCircleIcon color="success" />
-                                            </IconButton>
-                                            <IconButton edge="end" title="Deny" sx={{ ml: 1 }} onClick={() => updateSignupStatus(member.signup_id, 'Cancelled')}>
-                                                <CancelIcon color="error" />
-                                            </IconButton>
-                                        </>
-                                    )
-                                }
-                            >
-                                <ListItemText
-                                    primary={member.name}
-                                    secondary={
-                                        (activity.requires_approval ? `Status: ${member.status} | ` : '') +
-                                        `Student No: ${member.student_number || 'N/A'}` +
-                                        ` | Role: ${member.role}` +
-                                        (member.can_drive ? ` | Driving (${member.car_spaces} total seats)` : '') +
-                                        (member.transport_needed ? ' | Needs Transport' : '')
+                        {activity.members && activity.members.map((member, idx) => (
+                            <div key={member.signup_id || member.user_id}>
+                                <ListItem
+                                    secondaryAction={
+                                        activity.requires_approval && ['Waiting List', 'Pending'].includes(member.status) && (
+                                            <>
+                                                <IconButton edge="end" title="Confirm" onClick={() => updateSignupStatus(member.signup_id, 'Confirmed')}>
+                                                    <CheckCircleIcon color="success" />
+                                                </IconButton>
+                                                <IconButton edge="end" title="Deny" sx={{ ml: 1 }} onClick={() => updateSignupStatus(member.signup_id, 'Cancelled')}>
+                                                    <CancelIcon color="error" />
+                                                </IconButton>
+                                            </>
+                                        )
                                     }
-                                />
-                            </ListItem>
+                                >
+                                    <ListItemText
+                                        primary={
+                                            <Typography variant="subtitle1" fontWeight="bold">
+                                                {member.name}
+                                                {member.role === 'Driver' && <Chip label="Driver" color="info" size="small" sx={{ ml: 1 }} />}
+                                                {member.transport_needed && <Chip label="Needs Lift" color="warning" size="small" sx={{ ml: 1 }} />}
+                                            </Typography>
+                                        }
+                                        secondary={
+                                            <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                                                <Typography variant="body2" component="span" display="block">
+                                                    Student No: <strong>{member.student_number || 'N/A'}</strong> | Status: <strong>{member.status}</strong>
+                                                </Typography>
+                                                {(member.emergency_contact_name || member.emergency_contact_phone) && (
+                                                    <Typography variant="body2" component="span" display="block" color="error.main">
+                                                        Emergency Contact: {member.emergency_contact_name || 'N/A'} ({member.emergency_contact_phone || 'N/A'})
+                                                    </Typography>
+                                                )}
+                                                {member.medical_notes && (
+                                                    <Typography variant="body2" component="span" display="block" color="warning.main">
+                                                        Medical/Dietary: {member.medical_notes}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        }
+                                    />
+                                </ListItem>
+                                {idx < activity.members.length - 1 && <Divider />}
+                            </div>
                         ))}
                     </List>
                 </AccordionDetails>
@@ -238,70 +265,112 @@ function AdminPage() {
     return (
         <Box sx={{ pb: 4 }}>
             <HeaderBanner
-                title="Admin Dashboard"
-                subtitle="Manage event signups, transport, and member approvals."
+                title="Admin Control Center"
+                subtitle="Manage event signups, transport logistics, and weekly session availability."
                 bgGradient="linear-gradient(135deg, #d32f2f 0%, #f44336 100%)"
             />
 
-            <Box sx={{ mb: 4 }}>
-                <Button variant="contained" color="warning" onClick={handleCacheOldImages}>Cache Old Images</Button>
-            </Box>
+            {/* Clean Tabbed Navigation Bar */}
+            <Paper elevation={2} sx={{ mb: 4, borderRadius: 2 }}>
+                <Tabs
+                    value={tabValue}
+                    onChange={(_, val) => setTabValue(val)}
+                    variant="fullWidth"
+                    indicatorColor="primary"
+                    textColor="primary"
+                >
+                    <Tab icon={<DateRangeIcon />} label="Weekly Sessions" />
+                    <Tab icon={<EventIcon />} label={`Upcoming Events (${upcomingEvents.length})`} />
+                    <Tab icon={<HistoryIcon />} label={`Past Events (${pastEvents.length})`} />
+                </Tabs>
+            </Paper>
 
-            {/* Weekly Session Status Toggles */}
-            <Box sx={{ my: 4 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>Weekly Session Signups Control</Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                    Toggle sessions ON to open signups for this week, or OFF to close signups (e.g. during Taster Sessions or holidays).
-                </Typography>
-                <Grid container spacing={2}>
-                    {sessionConfigs.map(s => (
-                        <Grid item xs={12} sm={6} key={s.id}>
-                            <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 2 }}>
-                                <Box>
-                                    <Typography variant="h6">{s.name}</Typography>
-                                    <Chip
-                                        label={s.is_active !== false ? "Active / Open" : "Not Running / Closed"}
-                                        color={s.is_active !== false ? "success" : "error"}
-                                        size="small"
-                                        sx={{ mt: 0.5 }}
-                                    />
-                                </Box>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={s.is_active !== false}
-                                            onChange={() => toggleSessionActive(s.id, s.is_active)}
-                                            color="success"
+            {/* TAB 0: Weekly Sessions & Controls */}
+            {tabValue === 0 && (
+                <Box>
+                    <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+                        <Typography variant="h6" fontWeight="bold" gutterBottom>
+                            Weekly Session Availability Controls
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                            Toggle sessions ON to open member signups, or OFF to close signups (e.g. during Taster Sessions or holidays).
+                        </Typography>
+                        <Grid container spacing={2}>
+                            {sessionConfigs.map(s => (
+                                <Grid item xs={12} sm={6} key={s.id}>
+                                    <Paper variant="outlined" sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 2 }}>
+                                        <Box>
+                                            <Typography variant="subtitle1" fontWeight="bold">{s.name}</Typography>
+                                            <Chip
+                                                label={s.is_active !== false ? "Signups Open" : "Session Closed"}
+                                                color={s.is_active !== false ? "success" : "error"}
+                                                size="small"
+                                                sx={{ mt: 0.5 }}
+                                            />
+                                        </Box>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={s.is_active !== false}
+                                                    onChange={() => toggleSessionActive(s.id, s.is_active)}
+                                                    color="success"
+                                                />
+                                            }
+                                            label={s.is_active !== false ? "Open" : "Closed"}
                                         />
-                                    }
-                                    label={s.is_active !== false ? "Open" : "Closed"}
-                                />
-                            </Paper>
+                                    </Paper>
+                                </Grid>
+                            ))}
                         </Grid>
-                    ))}
-                </Grid>
-            </Box>
+                    </Paper>
 
-            <Divider sx={{ my: 4 }} />
+                    <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+                        This Week's Session Roster & Lifts
+                    </Typography>
+                    {weeklySessions.length > 0 ? (
+                        weeklySessions.map(renderActivity)
+                    ) : (
+                        <Paper sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                            No signups submitted for weekly sessions this week.
+                        </Paper>
+                    )}
+                </Box>
+            )}
 
-            <Box sx={{ my: 4 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>Weekly Sessions (This Week Signups)</Typography>
-                {weeklySessions.length > 0 ? weeklySessions.map(renderActivity) : <Typography color="textSecondary">No signups for sessions this week.</Typography>}
-            </Box>
+            {/* TAB 1: Upcoming Events */}
+            {tabValue === 1 && (
+                <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Typography variant="h5" fontWeight="bold">Upcoming Events & Transport</Typography>
+                        <Button variant="outlined" color="warning" size="small" onClick={handleCacheOldImages}>
+                            Cache Image URLs
+                        </Button>
+                    </Box>
+                    {upcomingEvents.length > 0 ? (
+                        upcomingEvents.map(renderActivity)
+                    ) : (
+                        <Paper sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                            No upcoming events with active signups found.
+                        </Paper>
+                    )}
+                </Box>
+            )}
 
-            <Divider sx={{ my: 4 }} />
-
-            <Box sx={{ my: 4 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>Upcoming Events</Typography>
-                {upcomingEvents.length > 0 ? upcomingEvents.map(renderActivity) : <Typography color="textSecondary">No upcoming events with signups.</Typography>}
-            </Box>
-
-            <Divider sx={{ my: 4 }} />
-
-            <Box sx={{ my: 4 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>Past Events</Typography>
-                {pastEvents.length > 0 ? pastEvents.map(renderActivity) : <Typography color="textSecondary">No past events with signups.</Typography>}
-            </Box>
+            {/* TAB 2: Past Events Archive */}
+            {tabValue === 2 && (
+                <Box>
+                    <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 3 }}>
+                        Past Events Archive
+                    </Typography>
+                    {pastEvents.length > 0 ? (
+                        pastEvents.map(renderActivity)
+                    ) : (
+                        <Paper sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                            No past events found in the archive.
+                        </Paper>
+                    )}
+                </Box>
+            )}
         </Box>
     );
 }

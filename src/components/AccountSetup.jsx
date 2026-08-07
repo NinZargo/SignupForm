@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
-import { Container, TextField, Button, Typography, Box, Alert, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Container, TextField, Button, Typography, Box, Alert, Select, MenuItem, FormControl, InputLabel, Paper, Divider } from '@mui/material';
 
 function AccountSetup() {
     const [name, setName] = useState("");
@@ -9,11 +9,13 @@ function AccountSetup() {
     const [studentNumberError, setStudentNumberError] = useState("");
     const [role, setRole] = useState("");
     const [carSpaces, setCarSpaces] = useState("");
+    const [emergencyContactName, setEmergencyContactName] = useState("");
+    const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
+    const [medicalNotes, setMedicalNotes] = useState("");
     const [apiError, setApiError] = useState(null);
-    const [message, setMessage] = useState(""); // State for the instructional message
+    const [message, setMessage] = useState("");
     const navigate = useNavigate();
 
-    // 1. Add a useEffect to fetch the user's current profile data on load
     useEffect(() => {
         async function loadProfile() {
             const { data: { user } } = await supabase.auth.getUser();
@@ -25,14 +27,15 @@ function AccountSetup() {
                     .single();
 
                 if (profile) {
-                    // Pre-fill the form with any existing data
                     setName(profile.name || "");
                     setRole(profile.role || "");
                     setStudentNumber(profile.student_number || "");
+                    setEmergencyContactName(profile.emergency_contact_name || "");
+                    setEmergencyContactPhone(profile.emergency_contact_phone || "");
+                    setMedicalNotes(profile.medical_notes || "");
 
-                    // 2. Set the instructional message if the student number is missing
                     if (!profile.student_number) {
-                        setMessage("Your profile is incomplete. Please add your student number to continue.");
+                        setMessage("Your profile is incomplete. Please complete your profile details to continue.");
                     }
                 }
             }
@@ -76,7 +79,10 @@ function AccountSetup() {
                 name,
                 email: user.email,
                 role,
-                student_number: studentNumber
+                student_number: studentNumber,
+                emergency_contact_name: emergencyContactName,
+                emergency_contact_phone: emergencyContactPhone,
+                medical_notes: medicalNotes
             });
 
         if (upsertError) {
@@ -87,7 +93,7 @@ function AccountSetup() {
         if (role === "Driver") {
             const { error: driverError } = await supabase
                 .from("cars")
-                .upsert({ driver_id: user.id, car_spaces: parseInt(carSpaces) }, { onConflict: 'driver_id' });
+                .upsert({ driver_id: user.id, car_spaces: parseInt(carSpaces) || 1 }, { onConflict: 'driver_id' });
 
             if (driverError) {
                 setApiError(driverError.message);
@@ -103,28 +109,36 @@ function AccountSetup() {
     };
 
     return (
-        <Container maxWidth="false" sx={{ width: "100vw", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <Box sx={{ p: 3, boxShadow: 3, borderRadius: 2, textAlign: 'center', maxWidth: 400, width: '100%' }}>
-                <Typography variant="h4" gutterBottom>Account Setup</Typography>
-                {/* 3. Display the instructional message or API errors */}
-                {message && !apiError && <Alert severity="info" sx={{ my: 2 }}>{message}</Alert>}
-                {apiError && <Alert severity="error" sx={{ my: 2 }}>{apiError}</Alert>}
+        <Container maxWidth="sm" sx={{ py: 6, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Paper elevation={4} sx={{ p: 4, borderRadius: 3, width: '100%' }}>
+                <Typography variant="h4" fontWeight="bold" align="center" gutterBottom color="primary">
+                    Account Profile Setup
+                </Typography>
+                <Typography variant="body2" color="textSecondary" align="center" sx={{ mb: 3 }}>
+                    Please enter your membership, emergency contact, and safety information.
+                </Typography>
+
+                {message && !apiError && <Alert severity="info" sx={{ mb: 3 }}>{message}</Alert>}
+                {apiError && <Alert severity="error" sx={{ mb: 3 }}>{apiError}</Alert>}
 
                 <form onSubmit={handleSetupComplete}>
-                    <TextField fullWidth label="Full Name" required margin="normal" value={name} onChange={(e) => setName(e.target.value)} />
+                    <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, mb: 1 }}>
+                        1. General Details
+                    </Typography>
+                    <TextField fullWidth label="Full Name" required margin="dense" value={name} onChange={(e) => setName(e.target.value)} />
                     <TextField
                         fullWidth
-                        label="Student Number"
+                        label="7-Digit Student Number"
                         required
-                        margin="normal"
+                        margin="dense"
                         value={studentNumber}
                         onChange={(e) => setStudentNumber(e.target.value)}
                         error={!!studentNumberError}
                         helperText={studentNumberError}
                     />
-                    <FormControl fullWidth required margin="normal">
+                    <FormControl fullWidth required margin="dense">
                         <InputLabel>Are you a driver?</InputLabel>
-                        <Select value={role} onChange={(e) => setRole(e.target.value)}>
+                        <Select value={role} label="Are you a driver?" onChange={(e) => setRole(e.target.value)}>
                             <MenuItem value="Driver">Yes, I can drive</MenuItem>
                             <MenuItem value="Member">No, I'm a passenger</MenuItem>
                         </Select>
@@ -132,19 +146,53 @@ function AccountSetup() {
                     {role === "Driver" && (
                         <TextField
                             fullWidth
-                            label="How many seats does your car have (including you)?"
+                            label="Total car seats (including driver)"
                             type="number"
                             required
-                            variant="outlined"
-                            margin="normal"
+                            margin="dense"
                             value={carSpaces}
                             onChange={(e) => setCarSpaces(e.target.value)}
                             inputProps={{ min: 1 }}
                         />
                     )}
-                    <Button fullWidth variant="contained" type="submit" sx={{ mt: 2 }}>Complete Setup</Button>
+
+                    <Divider sx={{ my: 3 }} />
+
+                    <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                        2. Safety & Emergency Contacts
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        label="Emergency Contact Name"
+                        required
+                        margin="dense"
+                        value={emergencyContactName}
+                        onChange={(e) => setEmergencyContactName(e.target.value)}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Emergency Contact Phone Number"
+                        required
+                        margin="dense"
+                        value={emergencyContactPhone}
+                        onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Medical Notes / Allergies / Dietary Needs"
+                        multiline
+                        rows={2}
+                        margin="dense"
+                        placeholder="e.g. Asthma, Peanut Allergy, Vegetarian, None"
+                        value={medicalNotes}
+                        onChange={(e) => setMedicalNotes(e.target.value)}
+                    />
+
+                    <Button fullWidth variant="contained" type="submit" size="large" sx={{ mt: 4, py: 1.5, borderRadius: 2 }}>
+                        Save & Complete Setup
+                    </Button>
                 </form>
-            </Box>
+            </Paper>
         </Container>
     );
 }
