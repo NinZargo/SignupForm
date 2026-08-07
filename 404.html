@@ -1,10 +1,18 @@
-<!-- Standard SPA 404 Fallback -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <script>
-      window.location.replace('/#' + window.location.pathname + window.location.search + window.location.hash);
+      // GitHub Pages serves this 404.html for any path that doesn't exist on disk.
+      // Store the intended path + search in sessionStorage, then redirect to root.
+      // index.html will restore the path via history.replaceState before React boots.
+      // Note: hash fragments are never sent to the server, so Supabase auth token
+      // redirects (which always target the root '/') are never affected by this.
+      var path = window.location.pathname + window.location.search;
+      if (path !== '/') {
+        sessionStorage.setItem('spa_redirect_path', path);
+      }
+      window.location.replace('/');
     </script>
   </head>
   <body></body>
