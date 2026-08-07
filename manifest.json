@@ -1,0 +1,17 @@
+{
+  "short_name": "Brunel Sailing",
+  "name": "Brunel Sailing Sign-Up",
+  "description": "Official Brunel Sailing Club event signups, weekly sessions, and Datchet live weather dashboard.",
+  "icons": [
+    {
+      "src": "/BrunelSailingIcon.jpeg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0d47a1",
+  "display": "standalone",
+  "orientation": "portrait"
+}
