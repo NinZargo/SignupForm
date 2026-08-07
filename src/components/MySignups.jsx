@@ -1,127 +1,108 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
-import { Container, Typography, Card, CardContent, Button, Box, Snackbar, Alert, Divider, Chip, Paper } from "@mui/material";
+// src/pages/MySignups.jsx
+import { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { useUser } from '../contexts/UserContext';
+import {
+    Box, Typography, List, ListItem, ListItemText, Chip, Paper, Divider, IconButton, Tooltip,
+    Accordion, AccordionSummary, AccordionDetails
+} from '@mui/material';
+import CancelIcon from '@mui/icons-material/Cancel';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-function MySignups() {
+function MySignupsPage() {
     const { profile } = useUser();
     const [upcomingSignups, setUpcomingSignups] = useState([]);
     const [pastSignups, setPastSignups] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-    useEffect(() => {
+    const fetchMySignups = async () => {
         if (!profile) {
             setLoading(false);
             return;
-        };
-
-        async function fetchSignups() {
-            const { data, error } = await supabase
-                .from("signups")
-                .select("id, status, events(*, requires_approval)")
-                .eq("user_id", profile.id);
-
-            if (error) {
-                console.error("Error fetching signups:", error);
-            } else {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const upcoming = [];
-                const past = [];
-
-                data.forEach(signup => {
-                    if (new Date(signup.events.date) >= today) {
-                        upcoming.push(signup);
-                    } else {
-                        past.push(signup);
-                    }
-                });
-
-                setUpcomingSignups(upcoming.sort((a, b) => new Date(a.events.date) - new Date(b.events.date)));
-                setPastSignups(past.sort((a, b) => new Date(b.events.date) - new Date(a.events.date)));
-            }
-            setLoading(false);
         }
-        fetchSignups();
+
+        const { data, error } = await supabase.rpc('get_my_signups', { p_user_id: profile.id });
+
+        if (error) {
+            console.error("Failed to fetch signups:", error);
+        } else if (data) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const upcoming = [];
+            const past = [];
+
+            data.forEach(item => {
+                const itemDate = new Date(item.item_date);
+                if (itemDate >= today) {
+                    upcoming.push(item);
+                } else {
+                    past.push(item);
+                }
+            });
+
+            setUpcomingSignups(upcoming.sort((a, b) => new Date(a.item_date) - new Date(b.item_date)));
+            setPastSignups(past.sort((a, b) => new Date(b.item_date) - new Date(a.item_date)));
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchMySignups();
     }, [profile]);
 
-    async function cancelSignup(signupId) {
-        const { error } = await supabase.from("signups").delete().eq("id", signupId);
+    const handleCancelSignup = async (signupId, itemType) => {
+        const tableName = itemType === 'session' ? 'session_signups' : 'signups';
+
+        const { error } = await supabase
+            .from(tableName)
+            .delete()
+            .eq('id', signupId);
+
         if (error) {
-            setSnackbar({ open: true, message: 'Failed to cancel signup.', severity: 'error' });
+            alert(`Failed to cancel signup: ${error.message}`);
         } else {
-            setSnackbar({ open: true, message: 'Signup canceled successfully!', severity: 'success' });
-            setUpcomingSignups(prev => prev.filter(s => s.id !== signupId));
-            setPastSignups(prev => prev.filter(s => s.id !== signupId));
+            alert("Your signup has been cancelled.");
+            await fetchMySignups();
         }
-    }
-
-    const formatDateForGoogle = (dateString) => {
-        const date = new Date(dateString);
-        date.setUTCHours(9, 0, 0, 0);
-        const startTime = date.toISOString().replace(/-|:|\.\d+/g, '');
-        date.setUTCHours(date.getUTCHours() + 1);
-        const endTime = date.toISOString().replace(/-|:|\.\d+/g, '');
-        return `${startTime}/${endTime}`;
     };
 
-    const handleSnackbarClose = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setSnackbar({ ...snackbar, open: false });
-    };
+    const renderSignupList = (items, isUpcoming = true) => (
+        <List component={Paper} elevation={2} sx={{ borderRadius: 2 }}>
+            {items.map((signup, index) => (
+                <div key={signup.signup_id}>
+                    <ListItem
+                        secondaryAction={
+                            isUpcoming && (
+                                <Tooltip title="Cancel Signup">
+                                    <IconButton edge="end" onClick={() => handleCancelSignup(signup.signup_id, signup.item_type)}>
+                                        <CancelIcon color="error" />
+                                    </IconButton>
+                                </Tooltip>
+                            )
+                        }
+                    >
+                        <ListItemText
+                            primary={
+                                <Typography variant="h6">
+                                    {signup.item_name}
+                                    <Chip label={signup.item_type === 'event' ? 'Event' : 'Session'} size="small" sx={{ ml: 2 }} />
+                                </Typography>
+                            }
+                            secondary={`Date: ${new Date(signup.item_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        />
+                        <Chip label={signup.status} color={signup.status === 'Confirmed' ? 'success' : 'default'} />
+                    </ListItem>
+                    {index < items.length - 1 && <Divider />}
+                </div>
+            ))}
+        </List>
+    );
 
-    const getStatusLabel = (status) => {
-        if (status === 'Waiting List') return 'On Waitlist';
-        return status;
-    };
-
-    const getChipStyling = (status) => {
-        if (status === 'Confirmed') return { color: 'success' };
-        if (status === 'Cancelled') return { color: 'error' };
-        return { color: 'default', sx: { backgroundColor: '#757575', color: 'white' } };
-    };
-
-    if (loading) return <Typography>Loading your signed-up events...</Typography>;
-
-    const SignupCard = ({ signup, isUpcoming }) => {
-        const { events } = signup;
-        if (!events) return null;
-        const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(events.name)}&dates=${formatDateForGoogle(events.date)}&details=${encodeURIComponent(events.description || '')}&location=${encodeURIComponent(events.location || '')}`;
-
-        return (
-            <Card sx={{ mb: 2 }}>
-                <CardContent>
-                    <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-                        <Typography variant="h5">{events.name}</Typography>
-                        {events.requires_approval && (
-                            <Chip
-                                label={getStatusLabel(signup.status)}
-                                size="small"
-                                {...getChipStyling(signup.status)}
-                            />
-                        )}
-                    </Box>
-                    <Typography variant="body2" color="textSecondary">📍 {events.location || 'No location specified'}</Typography>
-                    <Typography variant="body2" color="textSecondary">📅 {new Date(events.date).toLocaleDateString()}</Typography>
-
-                    {isUpcoming && (
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-                            <Button variant="contained" color="secondary" onClick={() => cancelSignup(signup.id)}>
-                                Cancel Signup
-                            </Button>
-                            <Button variant="outlined" href={googleCalendarUrl} target="_blank" rel="noopener noreferrer">
-                                Add to Calendar
-                            </Button>
-                        </Box>
-                    )}
-                </CardContent>
-            </Card>
-        );
-    };
+    if (loading) return <Typography>Loading your signups...</Typography>;
 
     return (
-        <Box>
+        <Box sx={{ pb: 4 }}>
             <Paper
                 elevation={4}
                 sx={{
@@ -137,33 +118,41 @@ function MySignups() {
                     My Signups
                 </Typography>
                 <Typography variant="subtitle1">
-                    Here are all the events you've signed up for, past and present.
+                    Here are all the events and sessions you've signed up for.
                 </Typography>
             </Paper>
 
-            <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>Upcoming</Typography>
+            {/* Upcoming Signups Section */}
+            <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
+                Upcoming Signups ({upcomingSignups.length})
+            </Typography>
             {upcomingSignups.length > 0 ? (
-                upcomingSignups.map(signup => <SignupCard key={signup.id} signup={signup} isUpcoming={true} />)
+                renderSignupList(upcomingSignups, true)
             ) : (
-                <Typography>No upcoming events.</Typography>
+                <Paper sx={{ p: 3, textAlign: 'center', color: 'text.secondary', mb: 4 }}>
+                    You haven't signed up for any upcoming events or sessions.
+                </Paper>
             )}
 
             <Divider sx={{ my: 4 }} />
 
-            <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>Past Events</Typography>
-            {pastSignups.length > 0 ? (
-                pastSignups.map(signup => <SignupCard key={signup.id} signup={signup} isUpcoming={false} />)
-            ) : (
-                <Typography>No past events.</Typography>
-            )}
-
-            <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose}>
-                <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
+            {/* Past Events Dropdown Accordion Section */}
+            <Accordion elevation={3} sx={{ borderRadius: '8px !important', overflow: 'hidden' }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">
+                        Past Events & Sessions ({pastSignups.length})
+                    </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                    {pastSignups.length > 0 ? (
+                        renderSignupList(pastSignups, false)
+                    ) : (
+                        <Typography color="text.secondary">No past event signups found.</Typography>
+                    )}
+                </AccordionDetails>
+            </Accordion>
         </Box>
     );
 }
 
-export default MySignups;
+export default MySignupsPage;

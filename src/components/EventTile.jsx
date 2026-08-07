@@ -1,11 +1,30 @@
 import { useEffect, useState } from "react";
 import {
-    Card, CardActionArea, CardContent, CardMedia, Typography, Dialog, DialogTitle,
-    DialogContent, DialogActions, Button, List, ListItem, ListItemText, Box,
-    FormControlLabel, Checkbox, Chip, Snackbar, Alert
+    Card,
+    CardActionArea,
+    CardContent,
+    CardMedia,
+    Typography,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    List,
+    ListItem,
+    ListItemText,
+    Box,
+    FormControlLabel,
+    Checkbox,
+    Chip,
+    Snackbar,
+    Alert
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
 import { useUser } from '../contexts/UserContext';
+
+// IMPORTANT: Ensure this URL is correct for your Supabase project
+const SUPABASE_URL = "https://jhhbluhsgqykccyivxei.supabase.co";
 
 function EventTile({ event, initialSignupStatus }) {
     const { profile, isAdmin } = useUser();
@@ -26,9 +45,9 @@ function EventTile({ event, initialSignupStatus }) {
 
     const handleOpen = async () => {
         setOpen(true);
-        if (isAdmin) {
-            await fetchSignups();
-        }
+        //if (isAdmin) {
+            //await fetchSignups();
+        //}
     };
 
     const handleClose = () => {
@@ -36,6 +55,8 @@ function EventTile({ event, initialSignupStatus }) {
         setOpen(false);
     };
 
+    /*
+    // Fetch signups for this event from Supabase. Removed due to error with RLS
     const fetchSignups = async () => {
         const { count, error } = await supabase
             .from("signups")
@@ -44,24 +65,16 @@ function EventTile({ event, initialSignupStatus }) {
         if (error) console.error("Error fetching signups:", error);
         else setSignupCount(count || 0);
     };
+    */
 
     const handleSignup = async () => {
         if (!profile) return;
-
         const initialStatus = event.requires_approval ? 'Waiting List' : 'Confirmed';
-
-        const { error } = await supabase.from("signups").insert([
-            {
-                user_id: profile.id,
-                event_id: event.id,
-                can_drive: canDrive,
-                transport_needed: needTransport,
-                status: initialStatus
-            },
-        ]);
-
+        const { error } = await supabase.from("signups").insert([{
+            user_id: profile.id, event_id: event.id, can_drive: canDrive,
+            transport_needed: needTransport, status: initialStatus
+        }]);
         if (error) {
-            console.error("Error signing up:", error);
             alert("Failed to sign up.");
         } else {
             handleClose();
@@ -74,30 +87,36 @@ function EventTile({ event, initialSignupStatus }) {
 
     const getStatusLabel = () => {
         if (signupStatus === 'Waiting List') return 'On Waitlist';
-        return signupStatus; // 'Confirmed' or 'Cancelled'
+        return signupStatus || 'Signed Up';
     };
 
+    // --- FIX IS HERE ---
+    // This function now guarantees that an `sx` property is always returned.
     const getChipStyling = (status) => {
-        if (status === 'Confirmed') return { color: 'success' };
-        if (status === 'Cancelled') return { color: 'error' };
+        if (status === 'Confirmed') {
+            return { color: 'success', sx: {} };
+        }
+        if (status === 'Cancelled') {
+            return { color: 'error', sx: {} };
+        }
         return { color: 'default', sx: { backgroundColor: '#757575', color: 'white' } };
     };
+
+    const imageUrl = event.image_url && event.image_url.startsWith('http')
+        ? event.image_url
+        : `${SUPABASE_URL}/storage/v1/object/public/event-images/${event.image_url}`;
 
     return (
         <>
             <Card sx={{ mb: 2, position: 'relative' }}>
-                {/* --- FIX IS HERE --- */}
-                {/* This now correctly shows a chip for ANY event the user is signed up for. */}
                 {isSignedUp && (
                     event.requires_approval ? (
-                        // For waitlist events, show the detailed status chip
                         <Chip
                             label={getStatusLabel()}
                             {...getChipStyling(signupStatus)}
                             sx={{ ...getChipStyling(signupStatus).sx, position: 'absolute', top: 8, right: 8, zIndex: 1 }}
                         />
                     ) : (
-                        // For regular events, show a simple "Signed Up" chip
                         <Chip
                             label="Signed Up"
                             color="success"
@@ -105,19 +124,16 @@ function EventTile({ event, initialSignupStatus }) {
                         />
                     )
                 )}
-                {/* --- END OF FIX --- */}
                 <CardActionArea onClick={handleOpen}>
                     <CardMedia
                         component="img"
                         height="140"
-                        image={event.image_url || "/default-event.jpg"}
+                        image={imageUrl}
                         alt={event.name}
                     />
                     <CardContent>
                         <Typography variant="h5">{event.name}</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                            📅 {new Date(event.date).toLocaleDateString()}
-                        </Typography>
+                        <Typography variant="body2" color="textSecondary">📅 {new Date(event.date).toLocaleDateString()}</Typography>
                     </CardContent>
                 </CardActionArea>
             </Card>
@@ -131,15 +147,9 @@ function EventTile({ event, initialSignupStatus }) {
             >
                 <DialogTitle>{event.name}</DialogTitle>
                 <DialogContent>
-                    {event.image_url && ( <CardMedia component="img" height="200" image={event.image_url} alt={event.name} sx={{ borderRadius: 2, marginBottom: 2 }} /> )}
+                    <CardMedia component="img" height="200" image={imageUrl} alt={event.name} sx={{ borderRadius: 2, marginBottom: 2 }} />
                     <Typography variant="body1" gutterBottom>{event.description || "No description available."}</Typography>
                     <Typography variant="body2" color="textSecondary">📅 {new Date(event.date).toLocaleDateString()}</Typography>
-
-                    {isAdmin && signupCount > 0 && (
-                        <div>
-                            <Typography variant="h6" sx={{ mt: 2 }}>Signups: {signupCount}</Typography>
-                        </div>
-                    )}
                     {!isSignedUp && (
                         profile?.role === "Driver" ? (
                             <Box display="flex" justifyContent="center" mt={2}>

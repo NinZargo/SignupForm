@@ -99,7 +99,7 @@ function AccountSetup() {
             data: { setup_complete: true }
         });
 
-        navigate("/dashboard");
+        navigate("/events");
     };
 
     return (
