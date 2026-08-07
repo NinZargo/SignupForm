@@ -12,6 +12,7 @@ const MySignups = lazy(() => import('./components/MySignups'));
 const UpdatePassword = lazy(() => import('./components/ResetPassword'));
 const AccessDenied = lazy(() => import('./components/AccessDenied'));
 const AdminPage = lazy(() => import('./components/AdminPage'));
+const DatchetPage = lazy(() => import('./components/DatchetPage'));
 
 const ProtectedRoute = () => {
     const { session, profile, loading } = useUser();
@@ -60,6 +61,7 @@ function AppRoutes() {
             <Route element={<ProtectedRoute />}>
                 <Route path="/events" element={<Events />} />
                 <Route path="/mysignups" element={<MySignups />} />
+                <Route path="/datchet" element={<DatchetPage />} />
                 {isAdmin && <Route path="/admin" element={<AdminPage />} />}
             </Route>
 

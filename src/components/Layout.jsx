@@ -44,7 +44,8 @@ function Layout({ children }) {
 
     const baseNavItems = [
         { label: 'Events', path: '/events' },
-        { label: 'My Signups', path: '/mysignups' }
+        { label: 'My Signups', path: '/mysignups' },
+        { label: 'Datchet', path: '/datchet' }
     ];
     const navItems = isAdmin ? [...baseNavItems, { label: 'Admin', path: '/admin' }] : baseNavItems;
 
