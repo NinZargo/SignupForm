@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import {
-    Container,
     Typography,
     Box,
     Paper,
@@ -22,6 +21,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import HeaderBanner from './HeaderBanner.jsx';
 
 const convertToCSV = (data, eventName, eventDate) => {
     const headers = ['Event Name', 'Event Date', 'Member Name', 'Student Number', 'Role', 'Can Drive', 'Needs Transport', 'Status'];
@@ -50,7 +50,6 @@ function AdminPage() {
 
     async function fetchAdminData() {
         try {
-            // Fetch events, session details, and session config settings
             const [eventsResponse, sessionsResponse, configsResponse] = await Promise.all([
                 supabase.rpc('get_event_transport_details'),
                 supabase.rpc('get_session_transport_details'),
@@ -66,7 +65,6 @@ function AdminPage() {
             setWeeklySessions(sortedSessions);
             setSessionConfigs(sortedConfigs);
 
-            // Your original logic for splitting events into upcoming and past
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const upcoming = [];
@@ -81,9 +79,9 @@ function AdminPage() {
             setUpcomingEvents(upcoming.sort((a, b) => new Date(a.event_date) - new Date(b.event_date)));
             setPastEvents(past.sort((a, b) => new Date(b.event_date) - new Date(a.event_date)));
 
-        } catch (error) {
-            console.error("Error fetching admin data:", error);
-            setError(error.message);
+        } catch (err) {
+            console.error("Error fetching admin data:", err);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -96,7 +94,6 @@ function AdminPage() {
     const toggleSessionActive = async (sessionId, currentActive) => {
         const newStatus = currentActive === false ? true : false;
 
-        // Optimistically update UI so switch toggles instantly
         setSessionConfigs(prev => prev.map(s => s.id === sessionId ? { ...s, is_active: newStatus } : s));
 
         const { data, error } = await supabase
@@ -107,7 +104,7 @@ function AdminPage() {
 
         if (error || !data || data.length === 0) {
             alert('Database RLS Error: Row-level security on table "sessions" blocked update. Please run the UPDATE policy in Supabase.');
-            await fetchAdminData(); // revert UI if update failed
+            await fetchAdminData();
         } else {
             await fetchAdminData();
         }
@@ -169,14 +166,13 @@ function AdminPage() {
                     .eq('id', event.id);
                 if (updateError) throw updateError;
                 console.log(`Successfully cached image for event ID: ${event.id}`);
-            } catch (error) {
-                console.error(`Failed to cache image for event ${event.id}:`, error);
+            } catch (err) {
+                console.error(`Failed to cache image for event ${event.id}:`, err);
             }
         }
         alert("Image caching process complete! Please refresh the page.");
     };
 
-    // This function now renders both events and sessions, as they share the same data structure
     const renderActivity = (activity) => (
         <Paper key={activity.event_id} sx={{ mb: 3, p: 3, boxShadow: 3, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -236,15 +232,16 @@ function AdminPage() {
         </Paper>
     );
 
-    if (loading) return <Typography>Loading admin data...</Typography>;
-    if (error) return <Typography color="error">Error: {error}</Typography>;
+    if (loading) return <Typography sx={{ p: 4 }}>Loading admin data...</Typography>;
+    if (error) return <Typography color="error" sx={{ p: 4 }}>Error: {error}</Typography>;
 
     return (
-        <Box>
-            <Paper elevation={4} sx={{ p: { xs: 2, sm: 3 }, mb: 4, borderRadius: 2, textAlign: 'center', background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)', color: 'white' }}>
-                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>Admin Dashboard</Typography>
-                <Typography variant="subtitle1">Manage event signups, transport, and member approvals.</Typography>
-            </Paper>
+        <Box sx={{ pb: 4 }}>
+            <HeaderBanner
+                title="Admin Dashboard"
+                subtitle="Manage event signups, transport, and member approvals."
+                bgGradient="linear-gradient(135deg, #d32f2f 0%, #f44336 100%)"
+            />
 
             <Box sx={{ mb: 4 }}>
                 <Button variant="contained" color="warning" onClick={handleCacheOldImages}>Cache Old Images</Button>
@@ -252,7 +249,7 @@ function AdminPage() {
 
             {/* Weekly Session Status Toggles */}
             <Box sx={{ my: 4 }}>
-                <Typography variant="h5" gutterBottom>Weekly Session Signups Control</Typography>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>Weekly Session Signups Control</Typography>
                 <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
                     Toggle sessions ON to open signups for this week, or OFF to close signups (e.g. during Taster Sessions or holidays).
                 </Typography>
@@ -285,25 +282,25 @@ function AdminPage() {
                 </Grid>
             </Box>
 
-            <Divider />
+            <Divider sx={{ my: 4 }} />
 
             <Box sx={{ my: 4 }}>
-                <Typography variant="h5" gutterBottom>Weekly Sessions (This Week Signups)</Typography>
-                {weeklySessions.length > 0 ? weeklySessions.map(renderActivity) : <Typography>No signups for sessions this week.</Typography>}
+                <Typography variant="h5" fontWeight="bold" gutterBottom>Weekly Sessions (This Week Signups)</Typography>
+                {weeklySessions.length > 0 ? weeklySessions.map(renderActivity) : <Typography color="textSecondary">No signups for sessions this week.</Typography>}
             </Box>
 
-            <Divider />
+            <Divider sx={{ my: 4 }} />
 
             <Box sx={{ my: 4 }}>
-                <Typography variant="h5" gutterBottom>Upcoming Events</Typography>
-                {upcomingEvents.length > 0 ? upcomingEvents.map(renderActivity) : <Typography>No upcoming events with signups.</Typography>}
+                <Typography variant="h5" fontWeight="bold" gutterBottom>Upcoming Events</Typography>
+                {upcomingEvents.length > 0 ? upcomingEvents.map(renderActivity) : <Typography color="textSecondary">No upcoming events with signups.</Typography>}
             </Box>
 
-            <Divider />
+            <Divider sx={{ my: 4 }} />
 
             <Box sx={{ my: 4 }}>
-                <Typography variant="h5" gutterBottom>Past Events</Typography>
-                {pastEvents.length > 0 ? pastEvents.map(renderActivity) : <Typography>No past events with signups.</Typography>}
+                <Typography variant="h5" fontWeight="bold" gutterBottom>Past Events</Typography>
+                {pastEvents.length > 0 ? pastEvents.map(renderActivity) : <Typography color="textSecondary">No past events with signups.</Typography>}
             </Box>
         </Box>
     );

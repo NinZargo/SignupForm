@@ -1,69 +1,21 @@
-// src/pages/MySignups.jsx
-import { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { useUser } from '../contexts/UserContext';
 import {
     Box, Typography, List, ListItem, ListItemText, Chip, Paper, Divider, IconButton, Tooltip,
     Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import HeaderBanner from './HeaderBanner.jsx';
+import { useMySignups } from '../hooks/useMySignups.js';
 
 function MySignupsPage() {
-    const { profile } = useUser();
-    const [upcomingSignups, setUpcomingSignups] = useState([]);
-    const [pastSignups, setPastSignups] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { upcomingSignups, pastSignups, loading, cancelSignup } = useMySignups();
 
-    const fetchMySignups = async () => {
-        if (!profile) {
-            setLoading(false);
-            return;
-        }
-
-        const { data, error } = await supabase.rpc('get_my_signups', { p_user_id: profile.id });
-
-        if (error) {
-            console.error("Failed to fetch signups:", error);
-        } else if (data) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const upcoming = [];
-            const past = [];
-
-            data.forEach(item => {
-                const itemDate = new Date(item.item_date);
-                if (itemDate >= today) {
-                    upcoming.push(item);
-                } else {
-                    past.push(item);
-                }
-            });
-
-            setUpcomingSignups(upcoming.sort((a, b) => new Date(a.item_date) - new Date(b.item_date)));
-            setPastSignups(past.sort((a, b) => new Date(b.item_date) - new Date(a.item_date)));
-        }
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        fetchMySignups();
-    }, [profile]);
-
-    const handleCancelSignup = async (signupId, itemType) => {
-        const tableName = itemType === 'session' ? 'session_signups' : 'signups';
-
-        const { error } = await supabase
-            .from(tableName)
-            .delete()
-            .eq('id', signupId);
-
-        if (error) {
-            alert(`Failed to cancel signup: ${error.message}`);
-        } else {
+    const handleCancel = async (signupId, itemType) => {
+        try {
+            await cancelSignup(signupId, itemType);
             alert("Your signup has been cancelled.");
-            await fetchMySignups();
+        } catch (error) {
+            alert(`Failed to cancel signup: ${error.message}`);
         }
     };
 
@@ -75,7 +27,7 @@ function MySignupsPage() {
                         secondaryAction={
                             isUpcoming && (
                                 <Tooltip title="Cancel Signup">
-                                    <IconButton edge="end" onClick={() => handleCancelSignup(signup.signup_id, signup.item_type)}>
+                                    <IconButton edge="end" onClick={() => handleCancel(signup.signup_id, signup.item_type)}>
                                         <CancelIcon color="error" />
                                     </IconButton>
                                 </Tooltip>
@@ -99,31 +51,18 @@ function MySignupsPage() {
         </List>
     );
 
-    if (loading) return <Typography>Loading your signups...</Typography>;
+    if (loading) return <Typography sx={{ p: 4 }}>Loading your signups...</Typography>;
 
     return (
         <Box sx={{ pb: 4 }}>
-            <Paper
-                elevation={4}
-                sx={{
-                    p: { xs: 2, sm: 3 },
-                    mb: 4,
-                    borderRadius: 2,
-                    textAlign: 'center',
-                    background: 'linear-gradient(45deg, #2E7D32 30%, #4CAF50 90%)',
-                    color: 'white'
-                }}
-            >
-                <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-                    My Signups
-                </Typography>
-                <Typography variant="subtitle1">
-                    Here are all the events and sessions you've signed up for.
-                </Typography>
-            </Paper>
+            <HeaderBanner
+                title="My Signups"
+                subtitle="Here are all the events and sessions you've signed up for."
+                bgGradient="linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)"
+            />
 
             {/* Upcoming Signups Section */}
-            <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
                 Upcoming Signups ({upcomingSignups.length})
             </Typography>
             {upcomingSignups.length > 0 ? (
@@ -139,7 +78,7 @@ function MySignupsPage() {
             {/* Past Events Dropdown Accordion Section */}
             <Accordion elevation={3} sx={{ borderRadius: '8px !important', overflow: 'hidden' }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6">
+                    <Typography variant="h6" fontWeight="bold">
                         Past Events & Sessions ({pastSignups.length})
                     </Typography>
                 </AccordionSummary>
