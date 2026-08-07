@@ -2,6 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        var isLocal = Boolean(
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname === '[::1]'
+        );
+        if ('serviceWorker' in navigator && isLocal) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister().then(function(success) {
+                if (success) {
+                  console.log('Unregistered stale dev ServiceWorker');
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        }
+      })();
+    </script>
     <link rel="icon" type="image/jpeg" href="/BrunelSailingIcon.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Brunel Sailing | Signup</title>
@@ -14,31 +35,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Brunel Sailing" />
     <link rel="apple-touch-icon" href="/BrunelSailingIcon.jpeg" />
-    <script type="module" crossorigin src="/assets/index-LXaIMUyK.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-Z1ni7NuF.js">
+    <script type="module" crossorigin src="/assets/index-D19esM7z.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DXuHBIIn.js">
     <link rel="stylesheet" crossorigin href="/assets/index-DCUYH1nR.css">
   </head>
   <body>
     <div id="root"></div>
     
-    <!-- Register Service Worker -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            // Unregister service worker in local dev mode to prevent Vite HMR module interception errors
-            navigator.serviceWorker.getRegistrations().then(registrations => {
-              for (let registration of registrations) {
-                registration.unregister();
-              }
-            });
-          } else {
-            navigator.serviceWorker.register('/sw.js')
-              .then(reg => console.log('PWA ServiceWorker registered:', reg))
-              .catch(err => console.log('PWA ServiceWorker registration failed:', err));
-          }
-        });
-      }
-    </script>
+    <!-- Register Service Worker in production only -->
   </body>
 </html>
