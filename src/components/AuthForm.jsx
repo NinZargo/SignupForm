@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { TextField, Button, Container, Typography, Box, Alert, Avatar } from '@mui/material';
+import { TextField, Button, Container, Typography, Box, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import fetchUnsplashImage from './UnsplashImg';
 import brunelSailingLogo from '../assets/BrunelSailingIcon.jpeg';
-import ImageAttribution from './ImageAttribution'; // Import the new component
+import ImageAttribution from './ImageAttribution';
 
 const AuthForm = () => {
     const [view, setView] = useState('signin');
@@ -13,7 +13,6 @@ const AuthForm = () => {
     const [error, setError] = useState(null);
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
-    // This state now holds the full image data object
     const [backgroundData, setBackgroundData] = useState({ imageUrl: '', photographerName: '', photographerUrl: '' });
 
     useEffect(() => {
@@ -49,7 +48,7 @@ const AuthForm = () => {
             else setMessage('Signup successful! Check your email to confirm.');
         } else if (view === 'forgot') {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: 'https://ninzargo.github.io/SignUpForm/#/',
+                redirectTo: 'https://signup.brunelsailing.co.uk/#/',
             });
             if (error) setError(error.message);
             else setMessage('Password reset email sent! Check your inbox.');
@@ -62,7 +61,7 @@ const AuthForm = () => {
             sx={{
                 width: "100vw",
                 height: "100vh",
-                position: 'relative', // Add position relative for the attribution
+                position: 'relative',
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
@@ -74,53 +73,80 @@ const AuthForm = () => {
         >
             <Box sx={{
                 p: 4,
-                boxShadow: 5,
-                borderRadius: 2,
-                maxWidth: 400,
-                width: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                boxShadow: 8,
+                borderRadius: 3,
+                maxWidth: 420,
+                width: '90%',
+                backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(28, 37, 65, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+                color: 'text.primary',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
+                backdropFilter: 'blur(10px)',
             }}>
                 <Box
                     component="img"
                     src={brunelSailingLogo}
                     alt="Brunel Sailing Logo"
-                    sx={{ height: 80, width: 80, mb: 2, borderRadius: '50%' }}
+                    sx={{ height: 80, width: 80, mb: 2, borderRadius: '50%', boxShadow: 2 }}
                 />
 
-                <Typography variant="h4" gutterBottom>
+                <Typography variant="h4" fontWeight="bold" gutterBottom color="text.primary">
                     {view === 'signup' ? 'Sign Up' : view === 'signin' ? 'Sign In' : 'Reset Password'}
                 </Typography>
 
-                {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
+                {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
+                {message && <Alert severity="success" sx={{ width: '100%', mb: 2 }}>{message}</Alert>}
 
-                <form onSubmit={handleSubmit}>
-                    <TextField fullWidth label="Email" variant="outlined" margin="normal" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+                    <TextField
+                        fullWidth
+                        label="Email Address"
+                        variant="outlined"
+                        margin="normal"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                    />
                     {view !== 'forgot' && (
-                        <TextField fullWidth label="Password" type="password" variant="outlined" margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                        <TextField
+                            fullWidth
+                            label="Password"
+                            type="password"
+                            variant="outlined"
+                            margin="normal"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
                     )}
-                    <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>
+                    <Button type="submit" variant="contained" color="primary" fullWidth size="large" sx={{ mt: 3, py: 1.2, borderRadius: 2 }}>
                         {view === 'signup' ? 'Sign Up' : view === 'signin' ? 'Sign In' : 'Send Reset Link'}
                     </Button>
                 </form>
 
-                <Typography variant="body2" sx={{ mt: 2 }}>
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
                     {view === 'signin' && (
                         <>
-                            Don't have an account? <Button variant="text" onClick={() => setView('signup')}>Sign Up</Button>
-                            <br />
-                            <Button variant="text" onClick={() => setView('forgot')}>Forgot Password?</Button>
+                            <Typography variant="body2" color="text.secondary">
+                                Don't have an account? <Button variant="text" size="small" onClick={() => setView('signup')}>Sign Up</Button>
+                            </Typography>
+                            <Button variant="text" size="small" sx={{ mt: 0.5 }} onClick={() => setView('forgot')}>Forgot Password?</Button>
                         </>
                     )}
-                    {view === 'signup' && ( <> Already have an account? <Button variant="text" onClick={() => setView('signin')}>Sign In</Button> </> )}
-                    {view === 'forgot' && ( <> Remembered your password? <Button variant="text" onClick={() => setView('signin')}>Sign In</Button> </> )}
-                </Typography>
+                    {view === 'signup' && (
+                        <Typography variant="body2" color="text.secondary">
+                            Already have an account? <Button variant="text" size="small" onClick={() => setView('signin')}>Sign In</Button>
+                        </Typography>
+                    )}
+                    {view === 'forgot' && (
+                        <Typography variant="body2" color="text.secondary">
+                            Remembered your password? <Button variant="text" size="small" onClick={() => setView('signin')}>Sign In</Button>
+                        </Typography>
+                    )}
+                </Box>
             </Box>
 
-            {/* Render the new attribution component */}
             <ImageAttribution
                 photographerName={backgroundData.photographerName}
                 photographerUrl={backgroundData.photographerUrl}
