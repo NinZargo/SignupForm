@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, Typography, Button, Box, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch, CardMedia } from '@mui/material';
+import { Card, CardContent, Typography, Button, Box, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch, CardMedia, Chip } from '@mui/material';
 import { supabase } from '../supabaseClient';
 
 
@@ -8,15 +8,11 @@ export default function SessionHeroCard({ session, isSignedUp, onSignupSuccess }
     const [canDrive, setCanDrive] = useState(false);
     const [needsTransport, setNeedsTransport] = useState(true);
 
-    const isRaceTraining = session.name === 'Race Training';
-    const currentDayOfWeek = new Date().getDay(); // Sunday = 0, Monday = 1, ..., Saturday = 6
-
-    // Disable the button if it's Race Training AND the day is Thursday, Friday, Saturday, or Sunday.
-    const isSignupBlocked = isRaceTraining && (currentDayOfWeek > 3 || currentDayOfWeek === 0);
+    const isActive = session.is_active !== false;
 
     const getButtonText = () => {
+        if (!isActive) return 'Not Running This Week';
         if (isSignedUp) return 'You are signed up';
-        if (isSignupBlocked) return 'Signups Open on Monday';
         return 'Sign Up';
     };
 
@@ -54,18 +50,21 @@ export default function SessionHeroCard({ session, isSignedUp, onSignupSuccess }
 
     return (
         <>
-            <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', opacity: isActive ? 1 : 0.75 }}>
                 <CardMedia component="img" height="200" image={session.image_url} alt={session.name} />
                 <CardContent sx={{ flexGrow: 1 }}>
-                    <Typography gutterBottom variant="h5" component="h2">{session.name}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Typography gutterBottom variant="h5" component="h2">{session.name}</Typography>
+                        {!isActive && <Chip label="Not Running" color="error" size="small" />}
+                    </Box>
                     <Typography variant="body1" color="text.secondary">
                         Next: {new Date(session.activity_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                     </Typography>
                     <Typography variant="body2" sx={{ mt: 1 }}>{session.description}</Typography>
                 </CardContent>
                 <Box sx={{ p: 2 }}>
-                    <Button variant="contained" fullWidth onClick={handleOpen} disabled={isSignedUp}>
-                        {isSignedUp ? 'You are signed up' : 'Sign Up'}
+                    <Button variant="contained" fullWidth onClick={handleOpen} disabled={!isActive || isSignedUp}>
+                        {getButtonText()}
                     </Button>
                 </Box>
             </Card>

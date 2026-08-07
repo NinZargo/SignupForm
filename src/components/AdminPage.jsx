@@ -14,7 +14,10 @@ import {
     AccordionDetails,
     Button,
     IconButton,
-    Divider
+    Divider,
+    FormControlLabel,
+    Switch,
+    Grid
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -39,6 +42,7 @@ const convertToCSV = (data, eventName, eventDate) => {
 
 function AdminPage() {
     const [weeklySessions, setWeeklySessions] = useState([]);
+    const [sessionConfigs, setSessionConfigs] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
     const [pastEvents, setPastEvents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -46,17 +50,21 @@ function AdminPage() {
 
     async function fetchAdminData() {
         try {
-            // Fetch both events and session details at the same time
-            const [eventsResponse, sessionsResponse] = await Promise.all([
+            // Fetch events, session details, and session config settings
+            const [eventsResponse, sessionsResponse, configsResponse] = await Promise.all([
                 supabase.rpc('get_event_transport_details'),
-                supabase.rpc('get_session_transport_details')
+                supabase.rpc('get_session_transport_details'),
+                supabase.from('sessions').select('*')
             ]);
 
             if (eventsResponse.error) throw eventsResponse.error;
             if (sessionsResponse.error) throw sessionsResponse.error;
 
-            // Set the data for weekly sessions
-            setWeeklySessions(sessionsResponse.data || []);
+            const sortedSessions = (sessionsResponse.data || []).sort((a, b) => (a.event_name || '').localeCompare(b.event_name || ''));
+            const sortedConfigs = (configsResponse.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            setWeeklySessions(sortedSessions);
+            setSessionConfigs(sortedConfigs);
 
             // Your original logic for splitting events into upcoming and past
             const today = new Date();
@@ -84,6 +92,26 @@ function AdminPage() {
     useEffect(() => {
         fetchAdminData();
     }, []);
+
+    const toggleSessionActive = async (sessionId, currentActive) => {
+        const newStatus = currentActive === false ? true : false;
+
+        // Optimistically update UI so switch toggles instantly
+        setSessionConfigs(prev => prev.map(s => s.id === sessionId ? { ...s, is_active: newStatus } : s));
+
+        const { data, error } = await supabase
+            .from('sessions')
+            .update({ is_active: newStatus })
+            .eq('id', sessionId)
+            .select();
+
+        if (error || !data || data.length === 0) {
+            alert('Database RLS Error: Row-level security on table "sessions" blocked update. Please run the UPDATE policy in Supabase.');
+            await fetchAdminData(); // revert UI if update failed
+        } else {
+            await fetchAdminData();
+        }
+    };
 
     const updateSignupStatus = async (signupId, newStatus) => {
         const { error } = await supabase
@@ -218,10 +246,49 @@ function AdminPage() {
                 <Typography variant="subtitle1">Manage event signups, transport, and member approvals.</Typography>
             </Paper>
 
-            <Button variant="contained" color="warning" onClick={handleCacheOldImages}>Cache Old Images</Button>
+            <Box sx={{ mb: 4 }}>
+                <Button variant="contained" color="warning" onClick={handleCacheOldImages}>Cache Old Images</Button>
+            </Box>
+
+            {/* Weekly Session Status Toggles */}
+            <Box sx={{ my: 4 }}>
+                <Typography variant="h5" gutterBottom>Weekly Session Signups Control</Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Toggle sessions ON to open signups for this week, or OFF to close signups (e.g. during Taster Sessions or holidays).
+                </Typography>
+                <Grid container spacing={2}>
+                    {sessionConfigs.map(s => (
+                        <Grid item xs={12} sm={6} key={s.id}>
+                            <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 2 }}>
+                                <Box>
+                                    <Typography variant="h6">{s.name}</Typography>
+                                    <Chip
+                                        label={s.is_active !== false ? "Active / Open" : "Not Running / Closed"}
+                                        color={s.is_active !== false ? "success" : "error"}
+                                        size="small"
+                                        sx={{ mt: 0.5 }}
+                                    />
+                                </Box>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={s.is_active !== false}
+                                            onChange={() => toggleSessionActive(s.id, s.is_active)}
+                                            color="success"
+                                        />
+                                    }
+                                    label={s.is_active !== false ? "Open" : "Closed"}
+                                />
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+            </Box>
+
+            <Divider />
 
             <Box sx={{ my: 4 }}>
-                <Typography variant="h5" gutterBottom>Weekly Sessions (This Week)</Typography>
+                <Typography variant="h5" gutterBottom>Weekly Sessions (This Week Signups)</Typography>
                 {weeklySessions.length > 0 ? weeklySessions.map(renderActivity) : <Typography>No signups for sessions this week.</Typography>}
             </Box>
 
