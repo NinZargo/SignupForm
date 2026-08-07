@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
+        // ── Password recovery interceptor ──────────────────────────────────────
+        // Runs synchronously before React / HashRouter initialise.
+        // Supabase appends tokens to window.location.hash, e.g.:
+        //   /#access_token=...&refresh_token=...&type=recovery
+        // HashRouter would overwrite the hash before Supabase can read the tokens,
+        // so we extract and stash them in sessionStorage first.
+        var hash = window.location.hash;
+        if (hash.indexOf('type=recovery') !== -1) {
+          // Strip the leading '#'
+          var params = new URLSearchParams(hash.substring(1));
+          var access_token = params.get('access_token');
+          var refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            sessionStorage.setItem('sb_recovery_access_token', access_token);
+            sessionStorage.setItem('sb_recovery_refresh_token', refresh_token);
+          }
+          // Rewrite hash so HashRouter routes to the password-reset page
+          window.location.hash = '#/update-password';
+        }
+
+        // ── Dev service worker cleanup ─────────────────────────────────────────
         var isLocal = Boolean(
           window.location.hostname === 'localhost' ||
           window.location.hostname === '127.0.0.1' ||
@@ -35,7 +56,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Brunel Sailing" />
     <link rel="apple-touch-icon" href="/BrunelSailingIcon.jpeg" />
-    <script type="module" crossorigin src="/assets/index-1aEmuE-i.js"></script>
+    <script type="module" crossorigin src="/assets/index-D56RIk6u.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DCUYH1nR.css">
   </head>
   <body>
