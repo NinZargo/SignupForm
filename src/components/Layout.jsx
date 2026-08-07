@@ -23,7 +23,7 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from '../contexts/UserContext';
 import { useColorMode } from '../contexts/ThemeContext';
-import { supabase } from "../supabaseClient";
+import InstallAppButton from "./InstallAppButton";
 
 function Layout({ children }) {
     const navigate = useNavigate();
@@ -139,8 +139,10 @@ function Layout({ children }) {
                             })}
                         </Stack>
 
+                        <InstallAppButton />
+
                         <Tooltip title={theme.palette.mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-                            <IconButton onClick={toggleColorMode} color="inherit" sx={{ ml: 1 }}>
+                            <IconButton onClick={toggleColorMode} color="inherit" sx={{ ml: 0.5 }}>
                                 {theme.palette.mode === 'dark' ? <Brightness7Icon color="warning" /> : <Brightness4Icon />}
                             </IconButton>
                         </Tooltip>
