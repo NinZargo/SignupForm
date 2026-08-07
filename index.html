@@ -4,24 +4,6 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
-        var href = window.location.href;
-        var hash = window.location.hash;
-        var path = window.location.pathname;
-
-        // 1. If path is /update-password, normalize to /#/update-password
-        if (path === '/update-password' || path === '/update-password/') {
-          window.location.replace(window.location.origin + '/#/update-password');
-          return;
-        }
-
-        // 2. If recovery token arrives in URL, normalize hash to #/update-password
-        if (href.indexOf('type=recovery') !== -1 || hash.indexOf('type=recovery') !== -1) {
-          if (hash.indexOf('#/update-password') === -1) {
-            window.location.replace(window.location.origin + '/#/update-password');
-            return;
-          }
-        }
-
         var isLocal = Boolean(
           window.location.hostname === 'localhost' ||
           window.location.hostname === '127.0.0.1' ||
@@ -53,7 +35,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Brunel Sailing" />
     <link rel="apple-touch-icon" href="/BrunelSailingIcon.jpeg" />
-    <script type="module" crossorigin src="/assets/index-pByh6kGe.js"></script>
+    <script type="module" crossorigin src="/assets/index-BhjxD8xE.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DCUYH1nR.css">
   </head>
   <body>
