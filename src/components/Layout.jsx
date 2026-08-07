@@ -79,7 +79,10 @@ function Layout({ children }) {
             flexDirection: 'column',
             minHeight: '100vh',
             width: '100vw',
-            backgroundColor: 'background.default',
+            backgroundColor: theme.palette.mode === 'light' ? '#f4f6f8' : '#0b132b',
+            backgroundImage: theme.palette.mode === 'light'
+                ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='%23dce4ec' fill-opacity='1'%3E%3Cpolygon fill-rule='evenodd' points='8 4 12 6 8 8 6 12 4 8 0 6 4 4 6 0 8 4'/%3E%3C/g%3E%3C/svg%3E")`
+                : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='%231c2541' fill-opacity='0.6'%3E%3Cpolygon fill-rule='evenodd' points='8 4 12 6 8 8 6 12 4 8 0 6 4 4 6 0 8 4'/%3E%3C/g%3E%3C/svg%3E")`,
         }}>
             <AppBar position="static" color="default" sx={{ boxShadow: "0 2px 10px rgba(0,0,0,0.08)" }}>
                 <Toolbar sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: { xs: "10px", sm: "10px 20px" } }}>
