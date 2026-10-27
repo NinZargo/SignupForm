@@ -138,6 +138,7 @@ function EventList() {
                         <SessionHeroCard
                             session={session}
                             isSignedUp={signedUpStatusMap.has(`session_${session.id}`)}
+                            signupStatus={signedUpStatusMap.get(`session_${session.id}`)}
                             onSignupSuccess={refetch}
                         />
                     </Grid>

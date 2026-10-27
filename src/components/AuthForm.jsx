@@ -6,7 +6,10 @@ import fetchUnsplashImage from './UnsplashImg';
 import brunelSailingLogo from '../assets/BrunelSailingIcon.jpeg';
 import ImageAttribution from './ImageAttribution';
 
+import { useUser } from '../contexts/UserContext';
+
 const AuthForm = () => {
+    const { session, profile, loading, recoveryMode } = useUser();
     const [view, setView] = useState('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -14,6 +17,18 @@ const AuthForm = () => {
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
     const [backgroundData, setBackgroundData] = useState({ imageUrl: '', photographerName: '', photographerUrl: '' });
+
+    useEffect(() => {
+        // Don't auto-redirect during a password recovery flow
+        if (recoveryMode) return;
+        if (!loading && session) {
+            if (profile?.student_number && profile?.name && profile?.medical_notes && profile.medical_notes.trim() !== '') {
+                navigate('/events', { replace: true });
+            } else {
+                navigate('/setup', { replace: true });
+            }
+        }
+    }, [session, profile, loading, recoveryMode, navigate]);
 
     useEffect(() => {
         async function loadBackgroundImage() {
@@ -35,8 +50,8 @@ const AuthForm = () => {
             if (error) {
                 setError(error.message);
             } else if (data.user) {
-                const { data: profile } = await supabase.from('users').select('student_number').eq('id', data.user.id).single();
-                if (profile && profile.student_number) {
+                const { data: userProfile } = await supabase.from('users').select('student_number, name, medical_notes').eq('id', data.user.id).single();
+                if (userProfile && userProfile.student_number && userProfile.name && userProfile.medical_notes && userProfile.medical_notes.trim() !== '') {
                     navigate('/events');
                 } else {
                     navigate('/setup');
@@ -47,8 +62,10 @@ const AuthForm = () => {
             if (error) setError(error.message);
             else setMessage('Signup successful! Check your email to confirm.');
         } else if (view === 'forgot') {
+            // Redirect to root — Supabase appends #access_token=...&type=recovery
+            // The onAuthStateChange PASSWORD_RECOVERY event handles routing cleanly
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: 'https://signup.brunelsailing.co.uk/#/',
+                redirectTo: window.location.origin,
             });
             if (error) setError(error.message);
             else setMessage('Password reset email sent! Check your inbox.');

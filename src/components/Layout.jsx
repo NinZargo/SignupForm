@@ -29,13 +29,13 @@ function Layout({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
-    const { isAdmin } = useUser();
+    const { isAdmin, logout } = useUser();
     const { toggleColorMode } = useColorMode();
     const theme = useTheme();
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        navigate('/');
+        await logout();
+        navigate('/', { replace: true });
     };
 
     const handleDrawerToggle = () => {

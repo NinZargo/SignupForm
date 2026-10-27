@@ -1,67 +1,67 @@
-import { useEffect, lazy, Suspense } from 'react';
-import { HashRouter as Router, Route, Routes, useNavigate, Navigate, Outlet } from "react-router-dom";
-import { Box, CircularProgress } from "@mui/material";
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { CustomThemeProvider } from './contexts/ThemeContext';
-import Layout from "./components/Layout";
-import AuthForm from "./components/AuthForm";
+import Layout from './components/Layout';
+import AuthForm from './components/AuthForm';
 
-const AccountSetup = lazy(() => import('./components/AccountSetup'));
-const Events = lazy(() => import('./components/EventList.jsx'));
-const MySignups = lazy(() => import('./components/MySignups'));
+const AccountSetup   = lazy(() => import('./components/AccountSetup'));
+const Events         = lazy(() => import('./components/EventList.jsx'));
+const MySignups      = lazy(() => import('./components/MySignups'));
 const UpdatePassword = lazy(() => import('./components/ResetPassword'));
-const AccessDenied = lazy(() => import('./components/AccessDenied'));
-const AdminPage = lazy(() => import('./components/AdminPage'));
-const DatchetPage = lazy(() => import('./components/DatchetPage'));
+const AccessDenied   = lazy(() => import('./components/AccessDenied'));
+const AdminPage      = lazy(() => import('./components/AdminPage'));
+const DatchetPage    = lazy(() => import('./components/DatchetPage'));
+
+const Spinner = () => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+    </Box>
+);
 
 const ProtectedRoute = () => {
-    const { session, profile, loading } = useUser();
+    const { session, profile, loading, recoveryMode } = useUser();
 
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
+    if (loading) return <Spinner />;
 
-    if (!session) {
-        return <Navigate to="/" replace />;
-    }
+    // Always let recovery flow through
+    if (recoveryMode) return <Navigate to="/update-password" replace />;
 
-    if (!profile?.name) {
+    if (!session) return <Navigate to="/" replace />;
+
+    if (!profile?.name || !profile?.student_number || !profile?.medical_notes || profile.medical_notes.trim() === '') {
         return <Navigate to="/setup" replace />;
     }
 
-    return (
-        <Layout>
-            <Outlet />
-        </Layout>
-    );
+    return <Layout><Outlet /></Layout>;
 };
 
 function AppRoutes() {
-    const { isAdmin } = useUser();
+    const { isAdmin, recoveryMode } = useUser();
     const navigate = useNavigate();
 
+    // Navigate to reset page as soon as recoveryMode is set.
+    // This runs after mount so navigate() is always available.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        if (params.has('error_description')) {
-            navigate('/access-denied');
+        if (recoveryMode) {
+            navigate('/update-password', { replace: true });
         }
-    }, [navigate]);
+    }, [recoveryMode, navigate]);
 
     return (
         <Routes>
-            <Route path="/" element={<AuthForm />} />
-            <Route path="/setup" element={<AccountSetup />} />
+            {/* Public */}
+            <Route path="/"                element={<AuthForm />} />
+            <Route path="/setup"           element={<AccountSetup />} />
             <Route path="/update-password" element={<UpdatePassword />} />
-            <Route path="/access-denied" element={<AccessDenied />} />
+            <Route path="/access-denied"   element={<AccessDenied />} />
 
+            {/* Protected */}
             <Route element={<ProtectedRoute />}>
-                <Route path="/events" element={<Events />} />
+                <Route path="/events"    element={<Events />} />
                 <Route path="/mysignups" element={<MySignups />} />
-                <Route path="/datchet" element={<DatchetPage />} />
+                <Route path="/datchet"   element={<DatchetPage />} />
                 {isAdmin && <Route path="/admin" element={<AdminPage />} />}
             </Route>
 
@@ -70,16 +70,12 @@ function AppRoutes() {
     );
 }
 
-function App() {
+export default function App() {
     return (
         <CustomThemeProvider>
             <Router>
                 <UserProvider>
-                    <Suspense fallback={
-                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                            <CircularProgress />
-                        </Box>
-                    }>
+                    <Suspense fallback={<Spinner />}>
                         <AppRoutes />
                     </Suspense>
                 </UserProvider>
@@ -87,5 +83,3 @@ function App() {
         </CustomThemeProvider>
     );
 }
-
-export default App;

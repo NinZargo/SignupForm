@@ -11,15 +11,33 @@ export function useMySignups() {
 
     const fetchMySignups = useCallback(async () => {
         if (!profile?.id) {
+            setUpcomingSignups([]);
+            setPastSignups([]);
             setLoading(false);
             return;
         }
 
         setLoading(true);
         try {
-            const { data, error: fetchErr } = await supabase.rpc('get_my_signups', { p_user_id: profile.id });
+            const [rpcRes, sessionSignupsRes, eventSignupsRes] = await Promise.all([
+                supabase.rpc('get_my_signups', { p_user_id: profile.id }),
+                supabase.from('session_signups').select('id, session_id, status').eq('user_id', profile.id),
+                supabase.from('signups').select('id, event_id, status').eq('user_id', profile.id)
+            ]);
 
-            if (fetchErr) throw fetchErr;
+            if (rpcRes.error) throw rpcRes.error;
+
+            const sessionStatusMap = new Map();
+            (sessionSignupsRes.data || []).forEach(ss => {
+                sessionStatusMap.set(ss.id, ss.status);
+                sessionStatusMap.set(`session_${ss.session_id}`, ss.status);
+            });
+
+            const eventStatusMap = new Map();
+            (eventSignupsRes.data || []).forEach(es => {
+                eventStatusMap.set(es.id, es.status);
+                eventStatusMap.set(`event_${es.event_id}`, es.status);
+            });
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -27,12 +45,25 @@ export function useMySignups() {
             const upcoming = [];
             const past = [];
 
-            (data || []).forEach(item => {
+            (rpcRes.data || []).forEach(item => {
+                let realStatus = item.status;
+
+                if (item.item_type === 'session') {
+                    realStatus = sessionStatusMap.get(item.signup_id) || sessionStatusMap.get(`session_${item.item_id}`) || item.status || 'Waiting List';
+                } else {
+                    realStatus = eventStatusMap.get(item.signup_id) || eventStatusMap.get(`event_${item.item_id}`) || item.status || 'Confirmed';
+                }
+
+                const updatedItem = {
+                    ...item,
+                    status: realStatus
+                };
+
                 const itemDate = new Date(item.item_date);
                 if (itemDate >= today) {
-                    upcoming.push(item);
+                    upcoming.push(updatedItem);
                 } else {
-                    past.push(item);
+                    past.push(updatedItem);
                 }
             });
 

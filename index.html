@@ -2,6 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        // ── BrowserRouter SPA fallback ─────────────────────────────────────────
+        // When GitHub Pages 404s on a direct URL (e.g. /events), public/404.html
+        // stores the intended path in sessionStorage and redirects to root.
+        // This script restores it before React/BrowserRouter initialises.
+        var redirect = sessionStorage.getItem('spa_redirect_path');
+        if (redirect) {
+          sessionStorage.removeItem('spa_redirect_path');
+          window.history.replaceState(null, '', redirect);
+        }
+
+        // ── Dev service worker cleanup ─────────────────────────────────────────
+        var isLocal = Boolean(
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname === '[::1]'
+        );
+        if ('serviceWorker' in navigator && isLocal) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister().then(function(success) {
+                if (success) {
+                  console.log('Unregistered stale dev ServiceWorker');
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        }
+      })();
+    </script>
     <link rel="icon" type="image/jpeg" href="/BrunelSailingIcon.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Brunel Sailing | Signup</title>
@@ -19,14 +51,21 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- Register Service Worker -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('PWA ServiceWorker registered:', reg))
-            .catch(err => console.log('PWA ServiceWorker registration failed:', err));
-        });
+    <!-- Register Service Worker in production only -->
+    <script type="module">
+      if ('serviceWorker' in navigator && !import.meta.env.DEV) {
+        const isLocal = Boolean(
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname === '[::1]'
+        );
+        if (!isLocal) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(reg => console.log('PWA ServiceWorker registered:', reg))
+              .catch(err => console.log('PWA ServiceWorker registration failed:', err));
+          });
+        }
       }
     </script>
   </body>
